@@ -1,0 +1,34 @@
+# secrets
+.env
+.env.*
+*.key
+*.pem
+
+# data & runtime
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/catalog.xlsx
+logs/
+*.log
+backups/
+*.bak
+*.before_sed.bak
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# timestamped backups (e.g. bot.py.bak.1778322844)
+*.bak.*

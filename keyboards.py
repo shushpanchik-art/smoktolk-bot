@@ -1,0 +1,206 @@
+"""Все inline-клавиатуры. callback_data — осмысленные, без слешей."""
+from aiogram.types import (InlineKeyboardMarkup, InlineKeyboardButton,
+                           ReplyKeyboardMarkup, KeyboardButton)
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from config import LEVELS, BOT_USERNAME
+
+
+def kb_accept_rules() -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="📜 Прочитать правила", callback_data="show_rules_first")
+    b.button(text="✅ Принимаю правила", callback_data="accept_rules")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def kb_share_phone() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="📱 Поделиться номером", request_contact=True)]],
+        resize_keyboard=True, one_time_keyboard=True
+    )
+
+
+def kb_main(is_admin: bool = False) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="👤 Профиль", callback_data="profile_main")
+    b.button(text="⭐️ Мои уровни", callback_data="levels_main")
+    b.button(text="🎁 Подарки", callback_data="gifts_main")
+    b.button(text="🛍 Ассортимент", callback_data="catalog_main")
+    b.button(text="👥 Пригласить друга", callback_data="referral_main")
+    b.button(text="📜 Правила", callback_data="rules_main")
+    b.button(text="🆘 Поддержка", callback_data="support_main")
+    b.button(text="💸 Списать баллы", callback_data="redeem_start")
+    if is_admin:
+        b.button(text="🛠 Админ-панель", callback_data="admin_main")
+    b.adjust(2, 2, 2, 1, 1, 1)
+    return b.as_markup()
+
+
+def kb_back_main() -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="« В главное меню", callback_data="back_main")
+    return b.as_markup()
+
+
+def kb_profile(age_verified: bool) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="📜 История операций", callback_data="profile_history")
+    if not age_verified:
+        b.button(text="🔞 Подтвердить возраст", callback_data="verify_start")
+    b.button(text="🎂 Указать день рождения", callback_data="profile_set_bday")
+    b.button(text="🔔 Уведомления", callback_data="profile_toggle_notify")
+    b.button(text="« Назад", callback_data="back_main")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def kb_levels() -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    for n in sorted(LEVELS.keys()):
+        b.button(text=f"L{n} • {LEVELS[n].name}", callback_data=f"level_info:{n}")
+    b.button(text="« Назад", callback_data="back_main")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def kb_back_to_levels() -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="« К списку уровней", callback_data="levels_main")
+    b.button(text="🏠 В меню", callback_data="back_main")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def kb_gifts_list(gifts: list[dict], available_codes: set[str]) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    for g in gifts:
+        prefix = "✅" if g["code"] in available_codes else f"🔒 L{g['min_level']}"
+        b.button(text=f"{prefix} {g['name']}", callback_data=f"gift_pick:{g['code']}")
+    b.button(text="« Назад", callback_data="back_main")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def kb_gift_confirm(code: str) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="🎁 Получить подарок", callback_data=f"gift_confirm:{code}")
+    b.button(text="« К списку", callback_data="gifts_main")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def kb_catalog_categories(categories: list[str]) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    titles = {
+        "liquid": "💧 Жидкости", "device": "📱 Устройства",
+        "accessories": "🎒 Аксессуары", "tools": "🔧 Инструменты",
+        "cables": "🔌 Кабели", "sweets": "🍬 Снеки",
+        "pods": "💨 Поды", "disposable": "🚬 Одноразки", "tobacco": "🌿 Табак",
+        # русские ключи из парсера прайса:
+        "устройства": "📱 Устройства", "одноразки": "🚬 Одноразки",
+        "расходники": "🔧 Расходники", "разное": "🎒 Разное",
+    }
+    for c in categories:
+        b.button(text=titles.get(c, c), callback_data=f"cat_cat:{c}")
+    b.button(text="« Назад", callback_data="back_main")
+    b.adjust(2)
+    return b.as_markup()
+
+
+def kb_catalog_products(products: list[dict], category: str, page: int, total_pages: int) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    for p in products:
+        b.button(text=p['name'], callback_data=f"cat_prod:{p['sku']}")
+    nav = []
+    if page > 0:
+        nav.append(("« Стр.", f"cat_page:{category}:{page-1}"))
+    nav.append((f"{page+1}/{total_pages}", "noop"))
+    if page < total_pages - 1:
+        nav.append(("Стр. »", f"cat_page:{category}:{page+1}"))
+    for text, cd in nav:
+        b.button(text=text, callback_data=cd)
+    b.button(text="« К категориям", callback_data="catalog_main")
+    rows = [1] * len(products) + [len(nav), 1]
+    b.adjust(*rows)
+    return b.as_markup()
+
+
+def kb_product_back(category: str) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="« К категории", callback_data=f"cat_cat:{category}")
+    b.button(text="🏠 В меню", callback_data="back_main")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def kb_referral_share(ref_code: str) -> InlineKeyboardMarkup:
+    link = f"https://t.me/{BOT_USERNAME}?start=ref_{ref_code}"
+    b = InlineKeyboardBuilder()
+    b.button(text="📤 Поделиться", switch_inline_query=f"Заходи в SMOKTOLK: {link}")
+    b.button(text="« Назад", callback_data="back_main")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def kb_verify_start() -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="📷 Прислать фото документа", callback_data="verify_send_photo")
+    b.button(text="« Отмена", callback_data="back_main")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def kb_verify_admin(req_id: int) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="✅ Подтвердить", callback_data=f"vrf_ok:{req_id}")
+    b.button(text="❌ Отклонить", callback_data=f"vrf_no:{req_id}")
+    b.button(text="⚠️ Запросить ещё", callback_data=f"vrf_again:{req_id}")
+    b.adjust(2, 1)
+    return b.as_markup()
+
+
+def kb_redeem_cancel() -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="« Отмена", callback_data="back_main")
+    return b.as_markup()
+
+
+def kb_admin_main() -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="📊 Статистика", callback_data="adm_stats")
+    b.button(text="👥 Пользователи", callback_data="adm_users")
+    b.button(text="✅ Заявки на верификацию", callback_data="adm_verifs")
+    b.button(text="🎁 Подарки", callback_data="adm_gifts")
+    b.button(text="📢 Рассылка", callback_data="adm_broadcast")
+    b.button(text="📤 Экспорт в CSV", callback_data="adm_export")
+    b.button(text="🔄 Обновить ассортимент", callback_data="adm_refresh_catalog")
+    b.button(text="📈 Отчёт за сегодня", callback_data="adm_today_report")
+    b.button(text="« В меню", callback_data="back_main")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def kb_admin_back() -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="« К админке", callback_data="admin_main")
+    return b.as_markup()
+
+
+def kb_admin_user_card(user_id: int) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="➕ Начислить", callback_data=f"adm_pts_add:{user_id}")
+    b.button(text="➖ Списать", callback_data=f"adm_pts_sub:{user_id}")
+    b.button(text="🔞 Тогл возраст", callback_data=f"adm_age_toggle:{user_id}")
+    b.button(text="📜 История", callback_data=f"adm_user_hist:{user_id}")
+    b.button(text="« К поиску", callback_data="adm_users")
+    b.adjust(2, 1, 1, 1)
+    return b.as_markup()
+
+
+def kb_broadcast_confirm() -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="✅ Разослать всем", callback_data="adm_bc_go")
+    b.button(text="« Отмена", callback_data="admin_main")
+    b.adjust(1)
+    return b.as_markup()
