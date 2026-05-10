@@ -1,6 +1,6 @@
-aiogram==3.13.1
-aiohttp==3.13.4
-aiosqlite==0.20.0
+aiogram==3.28.2
+aiohttp==3.13.5
+aiosqlite==0.22.1
 openpyxl==3.1.5
 qrcode==7.4.2
 Pillow==12.2.0
