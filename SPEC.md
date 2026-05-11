@@ -245,6 +245,78 @@ sudo tail -f /opt/smoktolk/bot/logs/backup.log
 - Бэкапы БД — `/opt/smoktolk/bot/backups/` + лог в `logs/backup.log`
 - Логи бота принадлежат пользователю `smoktolk`, читаются всеми (`-rw-rw-r--`); для `tail -f` sudo не нужен
 
+### 17.4 Инструменты контроля качества и безопасности кода
+
+В проекте используется набор инструментов для регулярной проверки качества и безопасности. Запускаются вручную из корня репозитория, все установлены в `venv`.
+
+#### Линтер: ruff
+
+Стиль, неиспользуемые импорты, f-string без placeholder, неоднозначные имена переменных.
+
+venv/bin/ruff check . --exclude venv --exclude data --exclude backups --exclude logs --statistics
+venv/bin/ruff check . --exclude venv --exclude data --exclude backups --exclude logs --output-format=concise
+venv/bin/ruff check . --fix --exclude venv --exclude data --exclude backups --exclude logs   # автофикс
+
+#### Security-сканер кода: bandit
+
+Hardcoded secrets, SQL-инъекции, eval/exec, shell=True. Сканируем только проектный код (без venv и тестов):
+venv/bin/bandit -r . -x venv,data,backups,logs,scripts,pycache -ll
+
+Для подробного отчёта:
+venv/bin/bandit -r bot.py catalog.py config.py db.py keyboards.py tasks.py utils.py webhook.py handlers/ -ll
+
+#### Уязвимости в зависимостях: pip-audit
+
+Проверка `requirements.txt`:
+venv/bin/pip-audit -r requirements.txt
+
+Проверка фактически установленных пакетов в venv:
+venv/bin/pip-audit
+
+#### Мёртвый код: vulture
+
+venv/bin/vulture . --exclude venv,data,backups,logs --min-confidence 80
+
+#### Цикломатическая сложность: radon
+
+Функции категории C+ (CC > 10) — кандидаты на рефакторинг:
+venv/bin/radon cc . -nc -e "venv/,data/,backups/,logs/"
+venv/bin/radon mi . -nb -e "venv/,data/,backups/,logs/"
+
+#### Dependabot (GitHub)
+
+- Алёрты безопасности: <https://github.com/shushpanchik-art/smoktolk-bot/security/dependabot>
+- Pull requests с обновлениями: <https://github.com/shushpanchik-art/smoktolk-bot/pulls?q=author%3Aapp%2Fdependabot>
+- CLI-проверка:
+
+gh pr list --repo shushpanchik-art/smoktolk-bot --state open --author "app/dependabot"
+gh api repos/shushpanchik-art/smoktolk-bot/dependabot/alerts --jq '.[] | {number, state, severity: .security_advisory.severity, package: .dependency.package.name, summary: .security_advisory.summary}'
+
+#### Pre-commit hook: gitleaks
+
+Запускается автоматически при `git commit`, блокирует коммит с секретами. Установка для новых разработчиков:
+scripts/setup-hooks.sh
+
+### 17.5 Регламент регулярных проверок
+
+| Периодичность | Что проверяем | Команды |
+|---|---|---|
+| **Перед каждым PR** | ruff (без новых ошибок), bandit (без новых medium+) | `venv/bin/ruff check ...`, `venv/bin/bandit -r ...` |
+| **Еженедельно** | Dependabot PR — обработать или закрыть | `gh pr list --author "app/dependabot"` |
+| **Еженедельно** | Dependabot alerts — все должны быть `fixed` или с обоснованием | команда `gh api .../dependabot/alerts` выше |
+| **Ежемесячно** | pip-audit на venv (системные пакеты вроде setuptools) | `venv/bin/pip-audit` |
+| **Ежемесячно** | Полный audit-прогон всех инструментов + запись результатов в CHANGELOG | все команды из 17.4 |
+| **При появлении CVE high+** | Внеплановое обновление, отдельный PR | через Dependabot или вручную |
+
+#### Целевые показатели
+
+- **ruff**: 0 ошибок в проектном коде (исключения — через `# noqa: <code>` с комментарием)
+- **bandit**: 0 medium+ в проектном коде (исключения — через `# nosec <code>` с обоснованием)
+- **pip-audit (requirements.txt)**: 0 уязвимостей
+- **pip-audit (venv)**: допустимы CVE в системных пакетах (setuptools, pip) — не блокирующее
+- **radon CC**: не больше 1-2 функций категории D, ни одной E (рефакторить по мере накопления)
+- **Dependabot alerts**: 0 в состоянии `open` со степенью `high`/`critical`
+
 ## 18. Схема БД (актуальная, проверена 2026-05-09)
 
 **Таблицы (8):** users, purchases, redemptions, gifts_log,
