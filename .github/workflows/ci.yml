@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    name: Python syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile all .py files
+        run: |
+          find . -name "*.py" \
+            -not -path "./venv/*" \
+            -not -path "./data/*" \
+            -not -path "./backups/*" \
+            -not -path "./logs/*" \
+            -not -path "./.git/*" \
+            -print0 | xargs -0 python -m py_compile
+
+  lint:
+    name: Ruff lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install ruff
+        run: pip install ruff==0.15.12
+      - name: Run ruff
+        run: |
+          ruff check . \
+            --exclude venv \
+            --exclude data \
+            --exclude backups \
+            --exclude logs \
+            --output-format=github
+        continue-on-error: true
+
+  security:
+    name: Bandit security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install bandit
+        run: pip install bandit==1.9.4
+      - name: Run bandit (medium and high only)
+        run: |
+          bandit -r . \
+            -x venv,data,backups,logs,scripts,__pycache__ \
+            -ll
+        continue-on-error: true
+
+  deps:
+    name: pip-audit (requirements.txt)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Audit requirements.txt
+        run: pip-audit -r requirements.txt
