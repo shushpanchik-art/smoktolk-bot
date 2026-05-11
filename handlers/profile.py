@@ -106,9 +106,9 @@ async def levels_main(cb: CallbackQuery):
     lines = ["⭐️ <b>Уровни программы</b>\n",
              f"Ваш текущий уровень: <b>L{user['level']}</b>\n"]
     for n in sorted(LEVELS.keys()):
-        l = LEVELS[n]
+        lvl = LEVELS[n]
         mark = "👉 " if n == user["level"] else "    "
-        lines.append(f"{mark}<b>L{n} {esc(l.name)}</b> — {int(l.earn_rate*100)}% кэшбэк")
+        lines.append(f"{mark}<b>L{n} {esc(lvl.name)}</b> — {int(lvl.earn_rate*100)}% кэшбэк")
     lines.append("\nНажмите на уровень для подробностей:")
     await cb.message.edit_text("\n".join(lines), reply_markup=kb.kb_levels())
     await cb.answer()
@@ -117,42 +117,42 @@ async def levels_main(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("level_info:"))
 async def level_info(cb: CallbackQuery):
     n = int(cb.data.split(":")[1])
-    l = LEVELS[n]
+    lvl = LEVELS[n]
     user = await db.get_user(cb.from_user.id)
     cond = []
-    if l.requires_age:
+    if lvl.requires_age:
         cond.append("• возраст 18+ подтверждён")
-    if l.min_lifetime_points or l.min_purchases_500:
+    if lvl.min_lifetime_points or lvl.min_purchases_500:
         cond.append(
-            f"• {l.min_lifetime_points} баллов за всё время "
-            f"<b>или</b> {l.min_purchases_500} покупок ≥ 500 ₽"
+            f"• {lvl.min_lifetime_points} баллов за всё время "
+            f"<b>или</b> {lvl.min_purchases_500} покупок ≥ 500 ₽"
         )
     if not cond:
         cond.append("• по умолчанию (для всех)")
 
     perks = [
-        f"• Кэшбэк <b>{int(l.earn_rate*100)}%</b>",
-        f"• Бонус за повторную покупку (3–{l.repeat_window_max} дн.): <b>+{int(l.repeat_bonus*100)}%</b>",
+        f"• Кэшбэк <b>{int(lvl.earn_rate*100)}%</b>",
+        f"• Бонус за повторную покупку (3–{lvl.repeat_window_max} дн.): <b>+{int(lvl.repeat_bonus*100)}%</b>",
     ]
-    if l.gift_cooldown_days:
-        perks.append(f"• Подарок за 1 ₽ — раз в {l.gift_cooldown_days} дн.")
-    if l.accessory_discount:
-        perks.append(f"• Скидка {int(l.accessory_discount*100)}% на аксессуары")
-    if l.free_delivery:
+    if lvl.gift_cooldown_days:
+        perks.append(f"• Подарок за 1 ₽ — раз в {lvl.gift_cooldown_days} дн.")
+    if lvl.accessory_discount:
+        perks.append(f"• Скидка {int(lvl.accessory_discount*100)}% на аксессуары")
+    if lvl.free_delivery:
         perks.append("• Бесплатная доставка аксессуаров")
 
     progress = ""
     if n == user["level"] + 1:
         progress = (
             f"\n\n📊 <b>До этого уровня:</b>\n"
-            f"  баллы: {user['lifetime_points']}/{l.min_lifetime_points}\n"
-            f"  покупки ≥500: {user['purchases_count_500']}/{l.min_purchases_500}"
+            f"  баллы: {user['lifetime_points']}/{lvl.min_lifetime_points}\n"
+            f"  покупки ≥500: {user['purchases_count_500']}/{lvl.min_purchases_500}"
         )
 
     text = (
-        f"<b>L{n} {esc(l.name)}</b>\n\n"
-               f"<b>Условия:</b>\n" + "\n".join(cond) + "\n\n"
-        f"<b>Преимущества:</b>\n" + "\n".join(perks)
+        f"<b>L{n} {esc(lvl.name)}</b>\n\n"
+               "<b>Условия:</b>\n" + "\n".join(cond) + "\n\n"
+        "<b>Преимущества:</b>\n" + "\n".join(perks)
         + progress
     )
     await cb.message.edit_text(text, reply_markup=kb.kb_back_to_levels())

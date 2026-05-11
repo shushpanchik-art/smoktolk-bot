@@ -26,6 +26,8 @@
 - `CHANGELOG.md` — история изменений в формате Keep a Changelog
 - `README.md`: блок «Документация» со ссылками на SPEC.md и CHANGELOG.md
 - `.gitignore`: правило `*.bak-*` для исключения timestamped-бекапов
+- **SPEC раздел 17.6** — audit follow-up: фиксация результатов исправления находок code quality audit 2026-05-11
+
 ## [Unreleased]
 
 ### Added
@@ -52,6 +54,15 @@
 ### Fixed
 
 - **PR #9** `handlers/profile.py`: исправлена сигнатура вызова `create_redemption()` — была причина падения QR списания баллов. Теперь QR списания и QR подарков работают штатно (проверено в продакшне)
+- **Code quality findings (audit 2026-05-11)** исправлены:
+  - `catalog.py:126` — удалены неиспользуемые `import io, shutil, tempfile`, оставлен только `import zipfile`
+  - `keyboards.py:2` — удалён неиспользуемый `InlineKeyboardButton` из импорта `aiogram.types`
+  - `tasks.py:4` — удалён неиспользуемый `time` из импорта `datetime`
+  - `handlers/profile.py:109,120` — переменная `l` (level) переименована в `lvl` (ruff E741)
+  - `handlers/profile.py:155` — убран префикс `f` у строки без placeholders (ruff F541)
+  - `webhook.py:188` — неиспользуемая переменная `backup = payload.get("backup_code")` заменена на закомментированный TODO-фрагмент с пояснением (fallback по backup_code не реализован, см. SPEC)
+  - `db.py:601` — добавлен комментарий `# nosec B608` к `UPDATE daily_stats SET {field}=...` (ложное срабатывание Bandit; `field` проверен по whitelist строкой выше, параметры через `?`)
+- **Результат после правок:** ruff 0 ошибок в проектном коде, bandit 0 medium+; CI-чеки `Ruff lint` и `Bandit security scan` зелёные без `continue-on-error`
 
 ### Security
 

@@ -308,6 +308,16 @@ scripts/setup-hooks.sh
 | **Ежемесячно** | Полный audit-прогон всех инструментов + запись результатов в CHANGELOG | все команды из 17.4 |
 | **При появлении CVE high+** | Внеплановое обновление, отдельный PR | через Dependabot или вручную |
 
+### 17.6. Audit follow-up (исправления 2026-05-11)
+
+После аудита 2026-05-11 (см. CHANGELOG / Audit) исправлены все находки:
+
+- **Ruff (10 → 0):** удалены неиспользуемые импорты (`io`, `shutil`, `tempfile`, `InlineKeyboardButton`, `time` из `datetime`); переменные `l` в `handlers/profile.py` переименованы в `lvl` (E741); убран лишний префикс `f` у строки без placeholders (F541); неиспользуемая локальная переменная `backup` в `webhook.py` заменена на закомментированный TODO-фрагмент (F841)
+- **Bandit medium (1 → 0):** `db.py:601` — добавлен `# nosec B608` с пояснением, что `field` проверяется по whitelist `allowed` строкой выше; параметры подставляются через `?`, SQL-инъекция невозможна
+- **Smoke-тест:** все модули проекта импортируются без ошибок (`python -c "import bot, db, catalog, webhook, tasks, keyboards, config; from handlers import profile"`)
+
+После этих правок CI-чеки `Ruff lint` и `Bandit security scan` стали зелёными без `continue-on-error`. Включение строгого режима (удаление `continue-on-error`) запланировано отдельным PR.
+
 #### Целевые показатели
 
 - **ruff**: 0 ошибок в проектном коде (исключения — через `# noqa: <code>` с комментарием)

@@ -123,7 +123,7 @@ def _load_workbook_safe(path: str):
         log.warning("Catalog xlsx has invalid styles, attempting sanitization: %s", e)
 
     # Fallback: распакуем zip, починим styles.xml, перепакуем во временный файл
-    import io, shutil, tempfile, zipfile
+    import zipfile
 
     tmp_path = path + ".sanitized.xlsx"
     with zipfile.ZipFile(path, "r") as zin:
