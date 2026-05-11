@@ -39,6 +39,8 @@
   - 23.6 — `gh pr view` падает на устаревшем GraphQL-поле `projectCards`
   - 23.7 — рецидив heredoc-инцидента №2 (LESSONS_LEARNED.md)
   - 23.8 — рецидив heredoc-инцидента №3 (`python3 << EOF`, `cat << EOF` с markdown)
+- **SPEC раздел 17.4** (PR #15) — документация по инструментам контроля качества и безопасности: ruff (линтер), bandit (security-сканер кода), pip-audit (CVE в зависимостях), vulture (мёртвый код), radon (цикломатическая сложность), Dependabot, gitleaks. Каждый инструмент с готовой командой запуска
+- **SPEC раздел 17.5** (PR #15) — регламент регулярных проверок: периодичность (перед каждым PR / еженедельно / ежемесячно / при CVE high+), целевые показатели (0 ошибок ruff в проектном коде, 0 medium+ bandit, 0 CVE в requirements.txt, max 1-2 функции категории D в radon)
 
 ### Changed
 
@@ -58,6 +60,17 @@
 - Добавлен установщик git-hooks (`scripts/setup-hooks.sh`) для автоматизации настройки у новых разработчиков
 - Удалён небезопасный разовый бэкап `backups/env_bak_20260509.tar.gz` (содержал `.env` с боевыми токенами при странных правах `0620`); процедура бэкапа `.env` пересмотрена — разовые архивы с секретами больше не создаются вручную
 
+### Audit
+
+- **Code quality audit 2026-05-11** проведён инструментами ruff, bandit, pip-audit, vulture, radon. Результаты:
+  - **ruff**: 10 замечаний (7 fixable) — unused imports, неоднозначное имя переменной `l`, одна f-string без placeholder, одна неиспользуемая переменная `backup` в `webhook.py` (technical debt — недореализованный fallback по `backup_code`). Будут исправлены в отдельном PR
+  - **bandit (проектный код)**: 1 medium (`db.py:601`) — ложное срабатывание, whitelist через множество `allowed` проверяется до подстановки в SQL. Закроется аннотацией `# nosec B608` с пояснением
+  - **pip-audit (requirements.txt)**: 0 уязвимостей
+  - **pip-audit (venv)**: 1 устаревший системный пакет `setuptools 66.1.1` (CVE-2024-6345, PYSEC-2025-49) — не используется ботом напрямую, обновление по плану
+  - **vulture**: 3 unused imports (тот же набор, что и ruff)
+  - **radon CC**: 1 функция категории E (`webhook.handle_purchase`, CC>40), 1 категории D (`catalog._parse_xlsx`), 3 категории C — кандидаты на рефакторинг (технический долг)
+  - **Dependabot alerts**: 27 алертов, все `fixed`; 0 открытых PR
+
 ### Housekeeping
 
 - Удалены устаревшие локальные бэкапы SPEC.md (`SPEC.md.bak.*`)
@@ -65,6 +78,8 @@
 - Удалены локальные `__pycache__/` каталоги (генерируются при запуске бота)
 - Удалены смерженные локальные ветки: `docs/incidents-23.6-23.7`, `fix/create-redemption-signature`, `docs/spec-diagnostics-notes`, `docs/spec-incident-heredoc-recurrence`
 - Очищены stale remote-ссылки (`git fetch --prune`)
+- Проведён комплексный security-аудит проекта (2026-05-11): pip-audit для `requirements.txt` — 0 уязвимостей; bandit для проектного кода — 1 medium (`db.py:601`, ложное срабатывание — whitelist полей сделан строкой выше) и 0 high; все 27 Dependabot security alerts в состоянии `fixed`
+- Установлены и зафиксированы dev-инструменты в venv: ruff 0.15.12, bandit 1.9.4, pip-audit, vulture, radon (используются для регламентных проверок согласно SPEC 17.5)
 
 ---
 
