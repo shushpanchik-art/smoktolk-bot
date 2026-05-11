@@ -32,3 +32,4 @@ Thumbs.db
 
 # timestamped backups (e.g. bot.py.bak.1778322844)
 *.bak.*
+*.bak-*
