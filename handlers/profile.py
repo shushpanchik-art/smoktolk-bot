@@ -7,7 +7,7 @@ from aiogram.fsm.state import StatesGroup, State
 
 import db
 import keyboards as kb
-from config import LEVELS
+from config import LEVELS, REDEEM_QR_TTL_MINUTES, MIN_REDEEM_POINTS
 from utils import esc, fmt_dt_iso, fmt_date_iso, parse_birthday
 
 router = Router()
@@ -191,7 +191,6 @@ async def redeem_start(cb: CallbackQuery, state: FSMContext):
 async def redeem_amount(msg: Message, state: FSMContext):
     from aiogram.types import BufferedInputFile
     from utils import make_qr
-    import secrets
     try:
         amount = int((msg.text or "").strip())
         if amount <= 0:
@@ -199,26 +198,27 @@ async def redeem_amount(msg: Message, state: FSMContext):
     except ValueError:
         await msg.answer("❌ Введите положительное целое число.")
         return
+    if amount < MIN_REDEEM_POINTS:
+        await msg.answer(
+            f"❌ Минимальная сумма списания — {MIN_REDEEM_POINTS} баллов.",
+            reply_markup=kb.kb_back_main()
+        )
+        return
     user = await db.get_user(msg.from_user.id)
     if amount > user["points"]:
         await msg.answer(f"❌ Недостаточно баллов. Доступно: {user['points']}")
         return
     await state.clear()
-    token = secrets.token_urlsafe(16)
-    backup = secrets.token_hex(3).upper()
     try:
-        await db.create_redemption(msg.from_user.id, amount, token, backup)
-    except AttributeError:
-        # если функция в db.py не реализована — fallback
-        await msg.answer(
-            "⚠️ Функция списания временно недоступна. Сообщите администратору.",
-            reply_markup=kb.kb_back_main()
+        token, backup = await db.create_redemption(
+            msg.from_user.id, amount, REDEEM_QR_TTL_MINUTES
         )
-        return
     except Exception as e:
         log.exception("create_redemption: %s", e)
-        await msg.answer("❌ Не удалось создать заявку. Попробуйте позже.",
-                         reply_markup=kb.kb_back_main())
+        await msg.answer(
+            "❌ Не удалось создать заявку. Попробуйте позже.",
+            reply_markup=kb.kb_back_main()
+        )
         return
     qr_png = make_qr(f"REDEEM:{token}")
     await msg.answer_photo(
@@ -227,7 +227,7 @@ async def redeem_amount(msg: Message, state: FSMContext):
             f"💸 <b>Списание {amount} баллов</b>\n\n"
             f"Покажите QR кассиру для списания.\n"
             f"Резервный код: <code>{backup}</code>\n"
-            f"Действует 30 минут."
+            f"Действует {REDEEM_QR_TTL_MINUTES} минут."
         ),
         reply_markup=kb.kb_back_main()
     )
