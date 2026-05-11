@@ -2,7 +2,7 @@ aiogram==3.28.2
 aiohttp==3.13.5
 aiosqlite==0.20.0
 openpyxl==3.1.5
-qrcode==7.4.2
+qrcode==8.2
 Pillow==12.2.0
 python-dotenv==1.2.2
 pytz==2026.2
