@@ -71,7 +71,7 @@ Telegram-бот программы лояльности офлайн-магаз�
 - SQLite (`/opt/smoktolk/bot/data/smoktolk.db`)
 - systemd + cron-бэкап (см. раздел 15)
 
-Полный список — `requirements.txt`. Venv: `/opt/smoktolk/bot/.venv/`.
+Полный список — `requirements.txt`. Venv: `/opt/smoktolk/bot/venv/`.
 
 ## 4. Архитектура
 
@@ -325,7 +325,7 @@ CREATE TABLE users (
 
 ### 21.3 Включённые механизмы безопасности
 
-- `.gitignore` — исключает `.env`, `backups/`, `*.db`, `logs/`, `.venv/`
+- `.gitignore` — исключает `.env`, `backups/`, `*.db`, `logs/`, `.venv/`, `venv/`
 - `.github/dependabot.yml` — еженедельная проверка зависимостей Python
 - `scripts/git-hooks/pre-commit` — запускает gitleaks перед коммитом
 - `scripts/setup-hooks.sh` — установщик git-hooks для новых разработчиков
