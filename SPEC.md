@@ -204,6 +204,9 @@ SPEC.md, README.md
 
 ## 17. Запуск / диагностика
 
+- Основной лог приложения: `/opt/smoktolk/bot/logs/bot.log` (RotatingFileHandler, см. `bot.py:setup_logging()`)
+- Свежие записи логгера бота: `tail -f /opt/smoktolk/bot/logs/bot.log`
+
 ```
 sudo systemctl status smoktolk-bot
 sudo systemctl restart smoktolk-bot
@@ -211,6 +214,36 @@ sudo journalctl -u smoktolk-bot -f
 sudo tail -f /opt/smoktolk/bot/logs/bot.log
 sudo tail -f /opt/smoktolk/bot/logs/backup.log
 ```
+
+### 17.1 Проверка синтаксиса Python-файлов
+
+- `python3 -m py_compile <file>` НЕ работает из-под `shushpanchik_art`, потому что `__pycache__/` принадлежит сервисному пользователю `smoktolk` (бот пишет туда `.pyc` при запуске)
+- Признак проблемы: `[Errno 13] Permission denied: '__pycache__/*.pyc.<random>'`
+- Правильный способ — парсинг AST без записи на диск:
+
+      python3 -c "import ast; ast.parse(open('handlers/profile.py').read()); print('OK')"
+
+- Альтернатива: запустить от имени `smoktolk` через `sudo -u smoktolk python3 -m py_compile <file>`
+- Главный критерий что код синтаксически валиден — бот успешно стартует и пишет в `logs/bot.log` строку `Bot started: @SMOKTOLK_bot`
+
+### 17.2 Работа с БД SQLite — корректный путь
+
+- Путь к БД: `/opt/smoktolk/bot/data/smoktolk.db` (НЕ `bot.db` — частая ошибка)
+- Список таблиц: `sqlite3 /opt/smoktolk/bot/data/smoktolk.db ".tables"`
+- Схема: `sqlite3 /opt/smoktolk/bot/data/smoktolk.db ".schema"`
+- Read-only режим (безопасно при работающем боте): добавить флаг `-readonly`
+- Форматированный вывод: флаги `-header -column`
+- Признак ошибки в пути: `Error: in prepare, no such table: <name>` — обычно значит, что обратились к несуществующему файлу БД (sqlite создаёт пустой)
+
+### 17.3 Где искать что — быстрая шпаргалка
+
+- Стартует ли процесс — `systemctl status smoktolk-bot`
+- Перезапуски, OOM, события systemd — `journalctl -u smoktolk-bot -n 50`
+- Ошибки бизнес-логики, Traceback приложения — `tail -100 /opt/smoktolk/bot/logs/bot.log`
+- Данные пользователей, баллы, redemptions — `sqlite3 -readonly /opt/smoktolk/bot/data/smoktolk.db ...`
+- Конфигурация — `/opt/smoktolk/bot/.env` (НЕ коммитить!)
+- Бэкапы БД — `/opt/smoktolk/bot/backups/` + лог в `logs/backup.log`
+- Логи бота принадлежат пользователю `smoktolk`, читаются всеми (`-rw-rw-r--`); для `tail -f` sudo не нужен
 
 ## 18. Схема БД (актуальная, проверена 2026-05-09)
 
