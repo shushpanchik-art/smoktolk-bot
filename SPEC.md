@@ -343,6 +343,23 @@ CREATE TABLE users (
 
 ---
 
+### 21.6 GitHub CLI (gh) — стандарт для работы с PR
+
+- Все PR создаются, просматриваются и мержатся через `gh` CLI (а не через веб-интерфейс GitHub)
+- Установка: `sudo apt install gh`; авторизация: `gh auth login` (token хранится в `~/.config/gh/`)
+- Базовые команды проекта (`OWNER/REPO` = `shushpanchik-art/smoktolk-bot`):
+  - Создать PR: `gh pr create --repo OWNER/REPO --base main --head <branch> --title "..." --body-file /tmp/pr-body.md`
+  - Тело PR — **только через `--body-file`**, не через `--body "..."` и не через heredoc (правило 24.2: запрет inline markdown с бэктиками)
+  - Просмотр PR: `gh pr view N --repo OWNER/REPO --json number,title,state,mergeable,mergeStateStatus,headRefName,baseRefName,url | python3 -m json.tool`
+  - **Не использовать** `gh pr view N` без `--json` до обновления `gh` CLI — падает на устаревшем поле `projectCards` (см. инцидент 23.6)
+  - Мерж: `gh pr merge N --repo OWNER/REPO --merge --delete-branch` (или `--squash` для squash-мержа)
+  - Список открытых PR: `gh pr list --repo OWNER/REPO --state open`
+- Проверка готовности к мержу: `mergeable: MERGEABLE` + `mergeStateStatus: CLEAN` = готов
+- Если `mergeable: UNKNOWN` — подождать 5–10 секунд (GitHub пересчитывает статус) и проверить повторно
+- Если `mergeable: CONFLICTING` — нужен rebase ветки PR поверх свежего `main`
+
+---
+
 ## 22. Termius — рабочий клиент SSH
 
 ### 22.1 Аккаунт и устройство
