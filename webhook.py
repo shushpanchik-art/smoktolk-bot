@@ -184,7 +184,8 @@ async def handle_redeem(request: web.Request) -> web.Response:
         return web.json_response({"ok": False, "error": "bad_json"}, status=400)
 
     qr_token = payload.get("qr_token")
-    backup = payload.get("backup_code")
+    # TODO: backup_code fallback не реализован, ожидается QR-токен (см. SPEC)
+    # backup = payload.get("backup_code")
 
     redemption = None
     if qr_token:

@@ -598,7 +598,8 @@ async def bump_daily(field: str, delta: int = 1, date: Optional[str] = None):
         return
     async with aiosqlite.connect(DB_PATH) as conn:
         await conn.execute("INSERT OR IGNORE INTO daily_stats (date) VALUES (?)", (date,))
-        await conn.execute(f"UPDATE daily_stats SET {field}={field}+? WHERE date=?", (delta, date))
+        # SECURITY: field валидируется whitelist `allowed` выше (CWE-89 mitigated); значения через ?-placeholder
+        await conn.execute(f"UPDATE daily_stats SET {field}={field}+? WHERE date=?", (delta, date))  # nosec B608
         await conn.commit()
 
 

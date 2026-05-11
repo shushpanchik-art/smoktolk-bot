@@ -1,7 +1,7 @@
 """Фоновые задачи: ежедневное сжигание баллов, поздравления с ДР."""
 import asyncio
 import logging
-from datetime import datetime, time, timezone, timedelta
+from datetime import datetime, timezone, timedelta
 from aiogram import Bot
 
 import db

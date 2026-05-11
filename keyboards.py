@@ -1,5 +1,5 @@
 """Все inline-клавиатуры. callback_data — осмысленные, без слешей."""
-from aiogram.types import (InlineKeyboardMarkup, InlineKeyboardButton,
+from aiogram.types import (InlineKeyboardMarkup,
                            ReplyKeyboardMarkup, KeyboardButton)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
