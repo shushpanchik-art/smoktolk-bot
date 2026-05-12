@@ -17,6 +17,7 @@ import catalog
 import webhook
 import tasks
 from handlers import ROUTERS
+import crash_alert
 
 
 def setup_logging():
@@ -48,6 +49,7 @@ async def on_startup(bot: Bot):
     ])
     me = await bot.get_me()
     logging.info("Bot started: @%s (id=%s)", me.username, me.id)
+    await crash_alert.notify_recovered_if_needed(bot)
 
 
 async def main():

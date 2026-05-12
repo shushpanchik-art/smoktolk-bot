@@ -15,6 +15,12 @@
 - **SPEC §24.7**: принцип «документация как часть Definition of Done» — изменение в коде/конфигурации/процессе не считается завершённым, пока соответствующая документация (SPEC/README/CHANGELOG) не обновлена в том же PR.
 - **SPEC §16**: файл `scripts/git-hooks/pre-push` добавлен в список файлов проекта.
 - **README**: в раздел «Безопасность» добавлен подраздел «Защита ветки `main`» с описанием двухуровневой защиты (pre-push hook + server-side branch protection) и корректного workflow через PR.
+- **Алерт админу о крэше бота** (DOWN / RECOVERED): двусторонние уведомления в Telegram при реальном падении процесса и при успешном восстановлении. Штатные операции (`systemctl restart/stop`, деплой) уведомлений не вызывают.
+  - **Архитектура:** два независимых канала через systemd (`ExecStopPost` в drop-in + `OnFailure` на резервный oneshot-юнит) с общим state-файлом `/run/smoktolk-bot/crashed` для идемпотентности (анти-дубликат DOWN при серии крэшей).
+  - **RECOVERED отправляется из Python (`crash_alert.py`), а не systemd**, чтобы уведомление уходило только после фактической готовности бота (`init_db` + `get_me` + `catalog.refresh`), а не сразу после fork процесса.
+  - **Новые файлы:** `crash_alert.py`, `scripts/notify_admin.sh`, `systemd/smoktolk-bot-alert.service`, `systemd/smoktolk-bot.service.d/10-alerts.conf`.
+  - **Изменения:** `bot.py` (import + вызов `notify_recovered_if_needed` в `on_startup`), `SPEC.md` (новый раздел §25 с архитектурой, таблицей сценариев, эксплуатацией и инцидент-историей).
+  - **Безопасность:** `BOT_TOKEN` и `ADMIN_CHAT_ID` читаются из окружения через `config`; в коде, скриптах и unit-файлах секретов нет (проверено `grep -RniE 'token|password|secret|api_key'`).
 
 ### Verified
 
@@ -22,6 +28,13 @@
   - **Позитивный** (push в фича-ветку): hook разрешает push, выводит сообщение об успешном прохождении. Push доходит до GitHub штатно.
   - **Негативный** (прямой push в `main`): hook блокирует операцию до отправки на сервер, выводит сообщение об отказе с инструкцией по правильному PR-флоу и подсказку про emergency `--no-verify`. `git push` возвращает non-zero, push не доходит до сервера.
   - Дополнительно: delete-операция в фича-ветке (`git push origin --delete feature/...`) обрабатывается hook'ом корректно и разрешается.
+- **Алерт крэша бота**: проверены ключевые сценарии (см. SPEC §25.4).
+  - `systemctl restart smoktolk-bot` → тишина (штатный рестарт не триггерит DOWN).
+  - `systemctl stop smoktolk-bot` → тишина (штатная остановка не триггерит DOWN).
+  - `kill -9 <pid>` → 1×DOWN → автостарт через `Restart=always` → 1×RECOVERED после полной инициализации (`init_db` + `get_me` + `catalog.refresh`).
+  - Серия крэшей подряд (множественные рестарты) → 1×DOWN на цикл, дубликаты подавлены через state-файл `/run/smoktolk-bot/crashed`.
+  - Чистый старт после `systemctl reset-failed` без предшествующего крэша → тишина (state-файл отсутствует, RECOVERED не отправляется).
+  - Синхронизация репозитория с боевыми путями (`/etc/systemd/system/smoktolk-bot.service.d/10-alerts.conf`, `/etc/systemd/system/smoktolk-bot-alert.service`) подтверждена через `diff` — файлы идентичны.
 
 ### Decisions
 
@@ -38,7 +51,6 @@
 - Скорректировать SPEC §21.8 и README раздел «Защита ветки `main`»: убрать упоминания server-side branch protection, явно зафиксировать, что защита локальная и почему (отдельный PR, follow-up к #28).
 - Добавить `pytest-cov` и coverage-бейдж в README (отдельный PR).
 - Добавить unit-тесты для критичных функций `add_purchase` и `recalc_level` (сейчас покрыт только `bump_daily` из трёх; `tests/test_age_verify.py`, `tests/test_bump_daily.py`, `tests/test_points.py` существуют).
-- Реализовать алерт админу о падении бота: systemd `OnFailure=` unit + Telegram-уведомление (следующая задача после этого PR).
 - Решить, что делать с 2 moderate Dependabot alerts на default branch (отдельный chore-PR).
 
 ---
