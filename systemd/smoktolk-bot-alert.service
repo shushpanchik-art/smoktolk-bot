@@ -1,0 +1,16 @@
+[Unit]
+Description=Smoktolk Bot — admin alert fallback (OnFailure)
+# Страховочный юнит. Срабатывает, если основной канал DOWN-уведомления
+# (ExecStopPost smoktolk-bot.service) не отработал, и systemd окончательно
+# перешёл в failed после исчерпания лимита Restart-попыток.
+# Скрипт сам обнаружит дубликат (по state-файлу) и тихо выйдет.
+# См. SPEC §25.
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/opt/smoktolk/bot/scripts/notify_admin.sh down
+StandardOutput=journal
+StandardError=journal
+Restart=no

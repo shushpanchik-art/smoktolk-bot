@@ -835,3 +835,94 @@ GitHub Branch Protection для приватных репозиториев тр
 - §21.7 — CI workflow проверяет код, но не документацию; ответственность за актуальность SPEC/README/CHANGELOG лежит на ревьюере PR (в нашем случае — на самом разработчике при self-review).
 - §23 — инциденты записываются по итогам разбора, тоже подпадают под этот принцип (запись инцидента = часть Definition of Done для post-mortem).
 
+---
+
+## 25. Алерты крэша бота (DOWN / RECOVERED)
+
+### 25.1 Назначение
+
+Гарантировать, что админ получает уведомление только при реальном крэше бота (ненулевой exit, OOM, SIGKILL) и не получает уведомлений при штатных операциях (`systemctl restart`, `systemctl stop`, деплой).
+
+После восстановления бот сам присылает RECOVERED — но только если ему есть что подтверждать (был зафиксирован крэш).
+
+### 25.2 Архитектура
+
+Два независимых канала уведомлений с общим state-файлом `/run/smoktolk-bot/crashed`:
+
+- Канал 1: systemd ExecStopPost (smoktolk-bot.service). Запускается при каждой остановке юнита; проверяет `$SERVICE_RESULT != success`.
+- Канал 2: systemd OnFailure → smoktolk-bot-alert.service. Срабатывает, если основной канал не отработал, и юнит ушёл в failed.
+
+Оба канала ведут в один скрипт `scripts/notify_admin.sh`, который:
+1. Проверяет state-файл — если есть, тихо выходит (анти-дубликат).
+2. Шлёт DOWN в Telegram.
+3. Создаёт state-файл.
+
+При следующем успешном старте бота `bot.py` вызывает `crash_alert.notify_recovered_if_needed()`, которая:
+1. Проверяет state-файл. Нет — тихо выходит.
+2. Шлёт RECOVERED.
+3. Удаляет state-файл.
+
+### 25.3 Файлы
+
+| Путь | Назначение | Владелец |
+|---|---|---|
+| `scripts/notify_admin.sh` | Отправка DOWN через curl к Telegram API. Анти-дубликат через state-файл. | root (exec) |
+| `crash_alert.py` | Python-модуль с `notify_recovered_if_needed(bot)`. Вызывается из `bot.py` после успешной инициализации. | smoktolk (бот) |
+| `systemd/smoktolk-bot.service.d/10-alerts.conf` | Drop-in к основному юниту: `Restart=always`, `RuntimeDirectory`, `ExecStopPost`, `OnFailure`. | root |
+| `systemd/smoktolk-bot-alert.service` | Страховочный oneshot-юнит, активируется через `OnFailure`. | root |
+| `/run/smoktolk-bot/crashed` | State-файл (создаётся скриптом, удаляется ботом). | root:smoktolk, 0664 |
+
+### 25.4 Гарантии и сценарии
+
+| Сценарий | Поведение | Проверено |
+|---|---|---|
+| `systemctl restart smoktolk-bot` (штатный) | Тишина | ✅ |
+| `systemctl stop smoktolk-bot` (штатная остановка) | Тишина | ✅ |
+| `kill -9 <pid>` (крэш) | 1 × DOWN → автостарт → 1 × RECOVERED | ✅ |
+| Серия крэшей подряд (10 рестартов) | 1 × DOWN на цикл (анти-дубликат через state-файл) | ✅ |
+| Чистый старт после `systemctl reset-failed` без крэша | Тишина (state-файла нет) | ✅ |
+| Долгая инициализация (catalog.refresh 60+ сек) | RECOVERED отправляется только после фактической готовности (init_db + get_me + catalog.refresh) | ✅ |
+| Сетевой сбой при отправке DOWN | DOWN не уйдёт, state-файл не создаётся → следующий старт молчит | ✅ (по коду) |
+| Сетевой сбой при отправке RECOVERED | RECOVERED не уйдёт, state-файл сохраняется → попытка повторится при следующем старте | ✅ (по коду) |
+
+### 25.5 Ключевые решения
+
+Почему два канала (ExecStopPost + OnFailure), а не один?
+`ExecStopPost` срабатывает на каждый stop — это основной путь. `OnFailure` — страховка на случай, если systemd окончательно сдался (`Result=exit-code` + лимит рестартов). Оба пути ведут в один скрипт, анти-дубликат через state-файл делает их идемпотентными.
+
+Почему RECOVERED шлёт Python, а не systemd?
+`ExecStartPost` срабатывает сразу после запуска процесса, до того как бот реально готов принимать апдейты. Если RECOVERED уйдёт «слишком рано» — а потом упадёт `catalog.refresh()` — админ получит RECOVERED + DOWN подряд, что вводит в заблуждение. Python-код шлёт RECOVERED только после `init_db()` + `get_me()` + `catalog.refresh()`, т.е. когда бот реально жив.
+
+Почему `RuntimeDirectoryPreserve=yes`?
+По умолчанию systemd удаляет `/run/<unit>/` при остановке юнита. Нам это не подходит — state-файл должен пережить рестарт между крэшем и восстановлением. `Preserve=yes` оставляет директорию.
+
+Почему `RuntimeDirectoryMode=0775`?
+Скрипт пишет в state-файл от root, бот удаляет от smoktolk. Директория принадлежит `smoktolk:smoktolk`, 0775 даёт права на запись группе + всем (чтобы root тоже мог).
+
+### 25.6 Эксплуатация
+
+Обновление drop-in или alert-юнита после изменений в репо:
+
+    sudo cp systemd/smoktolk-bot.service.d/10-alerts.conf \
+            /etc/systemd/system/smoktolk-bot.service.d/10-alerts.conf
+    sudo cp systemd/smoktolk-bot-alert.service \
+            /etc/systemd/system/smoktolk-bot-alert.service
+    sudo systemctl daemon-reload
+    sudo systemctl restart smoktolk-bot
+
+Проверка состояния канала алертов:
+
+    # Есть ли активный крэш (state-файл)?
+    ls -la /run/smoktolk-bot/crashed 2>/dev/null && echo "есть незакрытый крэш" || echo "чисто"
+
+    # История DOWN/RECOVERED за сутки:
+    journalctl -u smoktolk-bot --since '24 hours ago' | grep -E 'notify_admin|RECOVERED'
+
+Ручной тест (только в dev/staging):
+
+    sudo pkill -9 -f 'python.*bot.py'
+    # Ожидание: DOWN → автостарт через 5 сек → RECOVERED
+
+### 25.7 Инцидент-история
+
+(пусто; раздел заполняется при первом продакшен-инциденте)
