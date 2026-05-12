@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Pre-push hook: блокирует прямой push в защищённые ветки.
+# Замена GitHub Branch Protection для приватных репо на free-тарифе.
+#
+# Защищённые ветки: main
+# Обход (на свой страх и риск): git push --no-verify
+
+set -u
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+PROTECTED_BRANCHES="refs/heads/main"
+
+# Git передаёт через stdin строки:
+#   <local_ref> <local_sha> <remote_ref> <remote_sha>
+# Нужно проверять remote_ref — куда реально пойдёт push,
+# а не текущую ветку (можно пушить feature → main через refspec).
+
+ZERO_SHA="0000000000000000000000000000000000000000"
+BLOCKED=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # Пустая строка — пропускаем
+    [ -z "$remote_ref" ] && continue
+
+    # Удаление ветки (local_sha == 0) — тоже блокируем для main
+    for protected in $PROTECTED_BRANCHES; do
+        if [ "$remote_ref" = "$protected" ]; then
+            if [ "$local_sha" = "$ZERO_SHA" ]; then
+                echo -e "${RED}🛑 Попытка УДАЛИТЬ защищённую ветку: $remote_ref${NC}"
+            else
+                echo -e "${RED}🛑 Прямой push в защищённую ветку запрещён: $remote_ref${NC}"
+            fi
+            BLOCKED=1
+        fi
+    done
+done
+
+if [ "$BLOCKED" -eq 1 ]; then
+    echo ""
+    echo -e "${YELLOW}💡 Правильный flow:${NC}"
+    echo "   1. git checkout -b feature/название"
+    echo "   2. git push origin feature/название"
+    echo "   3. Открой Pull Request на GitHub"
+    echo "   4. Дождись прохождения CI"
+    echo "   5. Merge через UI"
+    echo ""
+    echo -e "${YELLOW}⚠️  Экстренный обход (только если 100% понимаешь риск):${NC}"
+    echo "   git push --no-verify"
+    exit 1
+fi
+
+echo -e "${GREEN}✅ pre-push: push в незащищённую ветку разрешён${NC}"
+exit 0

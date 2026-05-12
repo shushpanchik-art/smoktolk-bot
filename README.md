@@ -67,8 +67,31 @@ Telegram-бот для табачного магазина: каталог, за
 
 - `.env` и `backups/` — в `.gitignore`, **никогда не попадают в репозиторий**
 - **gitleaks** проверяет каждый коммит локально (pre-commit hook)
+- **pre-push hook** блокирует прямой `git push` в ветку `main` (см. подраздел «Защита ветки `main`» ниже)
 - **Dependabot** еженедельно проверяет зависимости на уязвимости
 - Если pre-commit hook нашёл секрет — коммит отменяется
+
+### Защита ветки `main`
+
+Ветка `main` защищена на двух уровнях:
+
+1. **Локально** — `scripts/git-hooks/pre-push` блокирует прямой `git push` в `main` ещё до отправки на GitHub. Устанавливается через `./scripts/setup-hooks.sh` (см. раздел Setup выше).
+2. **На сервере** — GitHub branch protection требует pull request с прохождением CI и не разрешает прямой push в `main` (см. SPEC §21.8).
+
+Корректный workflow:
+
+    git checkout -b feat/my-change
+    # ... правки, коммиты ...
+    git push origin feat/my-change
+    # создать PR в GitHub UI → дождаться зелёного CI → merge
+
+Если pre-push hook сработал и заблокировал push — это **ожидаемое поведение**, а не ошибка. Переключись на фича-ветку и открой PR.
+
+В критических случаях (например, hotfix во время инцидента) hook можно временно обойти:
+
+    git push --no-verify
+
+⚠️ Используй `--no-verify` для push **только** если действительно нужно срочно и согласовано с командой. Server-side protection всё равно отклонит прямой push в `main`.
 
 ### Обход pre-commit hook (только в крайних случаях)
 
