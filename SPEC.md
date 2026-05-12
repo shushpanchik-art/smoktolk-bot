@@ -475,6 +475,40 @@ CREATE TABLE users (
 
 ---
 
+
+### 21.7. GitHub Actions CI workflow
+
+С PR #17 в репозитории работает CI на GitHub Actions (`.github/workflows/ci.yml`). Workflow триггерится на:
+
+- `push` в ветку `main`;
+- `pull_request` в любую ветку.
+
+**Параллельные job-ы (все обязательные после PR #18):**
+
+| Job | Что проверяет | Команда |
+|---|---|---|
+| `Python syntax check` | Синтаксис всех `.py` файлов | `python -m py_compile $(git ls-files '*.py')` |
+| `Ruff lint` | Стиль и качество кода (PEP8, unused imports, naming) | `ruff check .` |
+| `Bandit security scan` | Статический анализ безопасности (medium+) | `bandit -r . -ll -x ./venv,./.venv,./tests` |
+| `pip-audit` | CVE в зависимостях из `requirements.txt` | `pip-audit -r requirements.txt` |
+
+**Соотношение с §17.4-17.5:**
+
+- Локально те же инструменты установлены в `venv/` и используются вручную перед коммитом.
+- CI — это **second line of defense** на случай, если разработчик забыл прогнать линтеры локально.
+- Pre-commit hook `gitleaks` (см. §21.4) работает только локально и не дублируется в CI.
+
+**Где смотреть статус CI:**
+
+- Вкладка **Actions** в GitHub: `https://github.com/shushpanchik-art/smoktolk-bot/actions`.
+- На странице PR — секция «Checks» внизу с галочками/крестиками по каждому джобу.
+- Badge статуса вынесен в `README.md` в шапку.
+
+**Политика после PR #18:**
+
+- Все 4 джоба — **блокирующие** (без `continue-on-error`). Красный CI = нельзя мержить.
+- Исключения для `nosec B608`, `noqa` и подобных аннотаций оформляются в коде с обязательным комментарием-обоснованием.
+
 ## 22. Termius — рабочий клиент SSH
 
 ### 22.1 Аккаунт и устройство
