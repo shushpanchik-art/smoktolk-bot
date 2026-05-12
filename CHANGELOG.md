@@ -16,6 +16,31 @@
 - **SPEC §16**: файл `scripts/git-hooks/pre-push` добавлен в список файлов проекта.
 - **README**: в раздел «Безопасность» добавлен подраздел «Защита ветки `main`» с описанием двухуровневой защиты (pre-push hook + server-side branch protection) и корректного workflow через PR.
 
+### Verified
+
+- **Pre-push hook**: проведены оба сценарных теста после merge PR #28.
+  - **Позитивный** (push в фича-ветку): hook разрешает push, выводит сообщение об успешном прохождении. Push доходит до GitHub штатно.
+  - **Негативный** (прямой push в `main`): hook блокирует операцию до отправки на сервер, выводит сообщение об отказе с инструкцией по правильному PR-флоу и подсказку про emergency `--no-verify`. `git push` возвращает non-zero, push не доходит до сервера.
+  - Дополнительно: delete-операция в фича-ветке (`git push origin --delete feature/...`) обрабатывается hook'ом корректно и разрешается.
+
+### Decisions
+
+- **Server-side branch protection для `main` НЕ внедряется**. Архитектурное решение, зафиксированное окончательно — к вопросу не возвращаемся.
+  - **Причина:** GitHub Branch Protection Rules недоступны на текущем плане (free, private repository). Подтверждено через `gh api repos/.../branches/main/protection` → HTTP 403 с сообщением "Upgrade to GitHub Pro or make this repository public to enable this feature."
+  - **Рассмотренные альтернативы и почему отклонены:**
+    - Upgrade на GitHub Pro (~$4/мес) — отклонено: текущей защиты достаточно для команды из одного контрибьютора.
+    - Сделать репозиторий публичным — отклонено: код содержит логику доменной модели, которую нецелесообразно открывать.
+  - **Принятая модель защиты `main`:** только локальный pre-push hook (`scripts/git-hooks/pre-push`), устанавливаемый через `scripts/setup-hooks.sh`. Это **единственный уровень защиты**, не «дополнительный» — формулировка SPEC §21.8 о «двойной защите» подлежит корректировке в следующем PR.
+  - **Принимаемые риски:** push в `main` возможен (а) с машины, где hook не установлен через `setup-hooks.sh`, (б) с явным `--no-verify`. Митигация — дисциплина flow и минимальное число контрибьюторов с прямым доступом.
+
+### Known issues / TODO
+
+- Скорректировать SPEC §21.8 и README раздел «Защита ветки `main`»: убрать упоминания server-side branch protection, явно зафиксировать, что защита локальная и почему (отдельный PR, follow-up к #28).
+- Добавить `pytest-cov` и coverage-бейдж в README (отдельный PR).
+- Добавить unit-тесты для критичных функций `add_purchase` и `recalc_level` (сейчас покрыт только `bump_daily` из трёх; `tests/test_age_verify.py`, `tests/test_bump_daily.py`, `tests/test_points.py` существуют).
+- Реализовать алерт админу о падении бота: systemd `OnFailure=` unit + Telegram-уведомление (следующая задача после этого PR).
+- Решить, что делать с 2 moderate Dependabot alerts на default branch (отдельный chore-PR).
+
 ---
 
 ## [0.2.2] — 2026-05-12
