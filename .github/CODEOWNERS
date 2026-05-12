@@ -1,0 +1,13 @@
+# CODEOWNERS — автоматическое назначение reviewers
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner для всего репо
+*       @shushpanchik-art
+
+# Критичные конфиги и инфраструктура
+/.github/                @shushpanchik-art
+/bot.py                  @shushpanchik-art
+/handlers/               @shushpanchik-art
+/requirements.txt        @shushpanchik-art
+/SPEC.md                 @shushpanchik-art
+/CHANGELOG.md            @shushpanchik-art
