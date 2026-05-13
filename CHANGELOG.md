@@ -14,9 +14,9 @@
   Закрывает Dependabot alert [#28](https://github.com/shushpanchik-art/smoktolk-bot/security/dependabot/28)
   (CVE-2025-71176 / GHSA-6w46-j5rx-g56g — `pytest` tmpdir handling, severity: moderate, scope: development).
   Alert [#29](https://github.com/shushpanchik-art/smoktolk-bot/security/dependabot/29) — тот же CVE,
-  выписанный на `requirements.txt`, является устаревшим (pytest был удалён из prod-зависимостей при
-  разделении dev/prod ещё до этого PR); закрывается автоматически после переоценки Dependabot, либо
-  вручную как `fixed`. `pytest-asyncio` поднят до 1.x, т.к. 0.25.2 жёстко требует `pytest<9`.
+  выписанный на `requirements.txt`, был устаревшим (pytest удалён из prod-зависимостей при разделении
+  dev/prod ещё до этого PR). Закрыт Dependabot'ом автоматически как `fixed` после переоценки графа
+  зависимостей (промежуточно вручную был помечен `dismissed`, но GitHub перевёл его в `fixed` поверх). `pytest-asyncio` поднят до 1.x, т.к. 0.25.2 жёстко требует `pytest<9`.
   Проверено: все 17 существующих тестов проходят (`asyncio_mode = auto` совместим с 1.x,
   breaking changes major-релиза не затрагивают наш код).
 
@@ -63,7 +63,6 @@
 
 - Добавить `pytest-cov` и coverage-бейдж в README (отдельный PR).
 - Добавить unit-тесты для критичных функций `add_purchase` и `recalc_level` (сейчас покрыт только `bump_daily` из трёх; `tests/test_age_verify.py`, `tests/test_bump_daily.py`, `tests/test_points.py` существуют).
-- Решить, что делать с 2 moderate Dependabot alerts на default branch (отдельный chore-PR).
 
 ---
 
