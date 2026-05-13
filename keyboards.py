@@ -93,13 +93,13 @@ def kb_gift_confirm(code: str) -> InlineKeyboardMarkup:
 def kb_catalog_categories(categories: list[str]) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     titles = {
-        "liquid": "💧 Жидкости", "device": "📱 Устройства",
+        "liquid": "💧 Жидкости", "device": "🎶 Устройства",
         "accessories": "🎒 Аксессуары", "tools": "🔧 Инструменты",
         "cables": "🔌 Кабели", "sweets": "🍬 Снеки",
-        "pods": "💨 Поды", "disposable": "🚬 Одноразки", "tobacco": "🌿 Табак",
+        "pods": "💨 Поды", "disposable": "🎵 Одноразки", "tobacco": "🌿 Табак",
         # русские ключи из парсера прайса:
-        "устройства": "📱 Устройства", "одноразки": "🚬 Одноразки",
-        "расходники": "🔧 Расходники", "разное": "🎒 Разное",
+        "устройства": "🎶 Устройства", "одноразки": "🎵 Одноразки",
+        "расходники": "🔋 Расходники", "разное": "🎒 Разное",
     }
     for c in categories:
         b.button(text=titles.get(c, c), callback_data=f"cat_cat:{c}")
