@@ -2,7 +2,7 @@
 import logging
 from aiogram import Router, F
 from aiogram.filters import CommandStart, CommandObject
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
@@ -14,6 +14,29 @@ from utils import normalize_phone, esc
 
 router = Router()
 log = logging.getLogger(__name__)
+
+# Welcome-баннер: показывается при каждом /start (и новичкам, и вернувшимся).
+# Файл лежит локально, в .gitignore — поэтому шлём как FSInputFile.
+from pathlib import Path as _Path
+_WELCOME_BANNER = _Path(__file__).resolve().parent.parent / "data" / "signboard_hor.jpg"
+_WELCOME_CAPTION = (
+    "🏪 <b>SMOKTOLK</b>\n"
+    "Магазин для тех, кто знает, чего хочет.\n\n"
+    "Программа лояльности: баллы за покупки, подарки за уровень, "
+    "приглашение друзей."
+)
+
+
+async def _send_welcome_banner(msg: Message) -> None:
+    """Шлёт картинку-вывеску с короткой подписью. Молча игнорит, если файла нет."""
+    if not _WELCOME_BANNER.exists():
+        log.warning("welcome banner not found: %s", _WELCOME_BANNER)
+        return
+    try:
+        await msg.answer_photo(FSInputFile(str(_WELCOME_BANNER)), caption=_WELCOME_CAPTION)
+    except Exception as e:
+        log.warning("welcome banner send failed: %s", e)
+
 
 
 class Reg(StatesGroup):
@@ -57,6 +80,7 @@ async def _start_common(msg: Message, state: FSMContext, referrer_id):
 
     if not user["rules_accepted_at"]:
         await state.set_state(Reg.awaiting_rules)
+        await _send_welcome_banner(msg)
         await msg.answer(DISCLAIMER_TEXT, reply_markup=kb.kb_accept_rules())
         return
 
