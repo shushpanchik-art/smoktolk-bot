@@ -105,3 +105,32 @@ SUPPORT_TEXT = (
     f"По всем вопросам обращайтесь: @{ADMIN_USERNAME}\n\n"
     "Время ответа: в течение рабочего дня."
 )
+
+
+# ─────────────────────────────────────────────────────────
+# Адрес магазина (PR #41)
+# Переопределяется через .env без редеплоя кода.
+# ─────────────────────────────────────────────────────────
+STORE_CITY    = os.getenv("STORE_CITY",    "Москва")
+STORE_ADDRESS = os.getenv("STORE_ADDRESS", "Волгоградский проспект, 10с2")
+STORE_HOURS   = os.getenv("STORE_HOURS",   "Ежедневно, 8:00 – 23:00")
+STORE_MAP_URL = os.getenv("STORE_MAP_URL", "https://yandex.com/maps/-/CPgJENnt")
+STORE_PHONE   = os.getenv("STORE_PHONE",   "")  # пусто = строка не показывается
+
+def _build_store_info_text() -> str:
+    lines = [
+        "📍 <b>Наш магазин</b>",
+        "",
+        f"<b>Адрес:</b> г. {STORE_CITY}, {STORE_ADDRESS}",
+        f"<b>Часы работы:</b> {STORE_HOURS}",
+    ]
+    if STORE_PHONE:
+        lines.append(f"<b>Телефон:</b> {STORE_PHONE}")
+    lines += [
+        "",
+        "🚫 Дистанционная продажа не осуществляется.",
+        "Покупка возможна только в розничном магазине после проверки документа.",
+    ]
+    return "\n".join(lines)
+
+STORE_INFO_TEXT = _build_store_info_text()

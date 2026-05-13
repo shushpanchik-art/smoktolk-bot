@@ -6,6 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
 import db
+from db import BirthdayAlreadySetError
 import keyboards as kb
 from config import LEVELS, REDEEM_QR_TTL_MINUTES, MIN_REDEEM_POINTS
 from utils import esc, fmt_dt_iso, fmt_date_iso, parse_birthday
@@ -75,8 +76,20 @@ async def profile_history(cb: CallbackQuery):
 
 @router.callback_query(F.data == "profile_set_bday")
 async def set_bday_start(cb: CallbackQuery, state: FSMContext):
+    user = await db.get_user(cb.from_user.id)
+    if user and user["birthday"]:
+        await cb.answer(
+            "Дата рождения уже указана. Изменить её может только поддержка.",
+            show_alert=True,
+        )
+        return
     await state.set_state(BDay.waiting)
-    await cb.message.answer("Введите дату рождения в формате <b>ДД.ММ.ГГГГ</b>:")
+    await cb.message.answer(
+        "🎂 Введите дату рождения в формате <b>ДД.ММ.ГГГГ</b>\n\n"
+        "⚠️ <b>Внимание:</b> дата рождения указывается <b>один раз</b> "
+        "и не может быть изменена самостоятельно. "
+        "Если допустите ошибку — обратитесь в поддержку."
+    )
     await cb.answer()
 
 
@@ -86,10 +99,22 @@ async def set_bday_got(msg: Message, state: FSMContext):
     if not iso:
         await msg.answer("❌ Неверный формат. Пример: 15.03.1990")
         return
-    await db.set_birthday(msg.from_user.id, iso)
+    try:
+        await db.set_birthday(msg.from_user.id, iso)
+    except BirthdayAlreadySetError:
+        await state.clear()
+        await msg.answer(
+            "⚠️ Дата рождения уже указана. "
+            "Изменить её может только поддержка.",
+            reply_markup=kb.kb_back_main(),
+        )
+        return
     await state.clear()
-    await msg.answer(f"✅ День рождения сохранён: {fmt_date_iso(iso)}",
-                     reply_markup=kb.kb_back_main())
+    await msg.answer(
+        f"✅ День рождения сохранён: {fmt_date_iso(iso)}\n\n"
+        f"ℹ️ Помните: изменить дату самостоятельно нельзя.",
+        reply_markup=kb.kb_back_main(),
+    )
 
 
 @router.callback_query(F.data == "profile_toggle_notify")

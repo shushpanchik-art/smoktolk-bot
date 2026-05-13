@@ -195,8 +195,27 @@ async def set_phone(user_id: int, phone: str):
         await conn.commit()
 
 
-async def set_birthday(user_id: int, bday: str):
+class BirthdayAlreadySetError(Exception):
+    """Попытка изменить уже установленную дату рождения без force."""
+
+
+async def set_birthday(user_id: int, bday: str, *, force: bool = False):
+    """
+    Устанавливает дату рождения. По умолчанию НЕ позволяет перезапись:
+    юзер может задать ДР только один раз. Перезапись доступна только админу
+    (force=True).
+    """
     async with aiosqlite.connect(DB_PATH) as conn:
+        if not force:
+            cur = await conn.execute(
+                "SELECT birthday FROM users WHERE user_id=?", (user_id,)
+            )
+            row = await cur.fetchone()
+            await cur.close()
+            if row and row[0]:
+                raise BirthdayAlreadySetError(
+                    f"birthday already set for user {user_id}: {row[0]}"
+                )
         await conn.execute("UPDATE users SET birthday=? WHERE user_id=?", (bday, user_id))
         await conn.commit()
 

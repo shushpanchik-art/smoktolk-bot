@@ -129,3 +129,75 @@ async def adm_export_new(cb: CallbackQuery):
     except ValueError:
         days = 1
     await _send_csv(cb, since_days=days, label=f"new_{days}d")
+
+
+# ============================================================
+# Админ: изменить дату рождения пользователя (force=True)
+# ============================================================
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
+from aiogram.types import Message
+from datetime import datetime as _dt
+
+import db as _db
+
+
+class AdmBday(StatesGroup):
+    awaiting_date = State()
+
+
+@router.callback_query(F.data.startswith("adm_bday_set:"))
+async def adm_bday_set_start(cb: CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        await cb.answer("Доступ запрещён", show_alert=True)
+        return
+    try:
+        uid = int(cb.data.split(":", 1)[1])
+    except ValueError:
+        await cb.answer("Битый ID", show_alert=True)
+        return
+    user = await _db.get_user(uid)
+    cur = (user or {}).get("birthday") or "не указана"
+    await state.set_state(AdmBday.awaiting_date)
+    await state.update_data(target_uid=uid)
+    await cb.message.answer(
+        f"🎂 <b>Изменение ДР пользователя</b> <code>{uid}</code>\n"
+        f"Текущая: <b>{cur}</b>\n\n"
+        "Пришлите новую дату в формате <code>ДД.ММ.ГГГГ</code>\n"
+        "Например: <code>15.03.1990</code>\n\n"
+        "Или /cancel для отмены."
+    )
+    await cb.answer()
+
+
+@router.message(AdmBday.awaiting_date, F.text == "/cancel")
+async def adm_bday_cancel(msg: Message, state: FSMContext):
+    await state.clear()
+    await msg.answer("Отменено.")
+
+
+@router.message(AdmBday.awaiting_date, F.text)
+async def adm_bday_set_apply(msg: Message, state: FSMContext):
+    if not is_admin(msg.from_user.id):
+        return
+    raw = (msg.text or "").strip()
+    try:
+        d = _dt.strptime(raw, "%d.%m.%Y")
+    except ValueError:
+        await msg.answer("❌ Неверный формат. Жду <code>ДД.ММ.ГГГГ</code>, например <code>15.03.1990</code>.")
+        return
+    iso = d.strftime("%Y-%m-%d")
+
+    data = await state.get_data()
+    uid = int(data.get("target_uid") or 0)
+    if not uid:
+        await state.clear()
+        await msg.answer("❌ Потерян target_uid, повторите.")
+        return
+
+    await _db.set_birthday(uid, iso, force=True)
+    await state.clear()
+    log.info("Admin %s set birthday for user %s -> %s", msg.from_user.id, uid, iso)
+    await msg.answer(
+        f"✅ ДР пользователя <code>{uid}</code> установлена: <b>{iso}</b>"
+    )
