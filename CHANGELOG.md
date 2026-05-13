@@ -8,6 +8,18 @@
 
 ## [Unreleased]
 
+### Security
+
+- **Bump dev-зависимостей**: `pytest 8.3.4 → 9.0.3`, `pytest-asyncio 0.25.2 → 1.3.0`.
+  Закрывает Dependabot alert [#28](https://github.com/shushpanchik-art/smoktolk-bot/security/dependabot/28)
+  (CVE-2025-71176 / GHSA-6w46-j5rx-g56g — `pytest` tmpdir handling, severity: moderate, scope: development).
+  Alert [#29](https://github.com/shushpanchik-art/smoktolk-bot/security/dependabot/29) — тот же CVE,
+  выписанный на `requirements.txt`, является устаревшим (pytest был удалён из prod-зависимостей при
+  разделении dev/prod ещё до этого PR); закрывается автоматически после переоценки Dependabot, либо
+  вручную как `fixed`. `pytest-asyncio` поднят до 1.x, т.к. 0.25.2 жёстко требует `pytest<9`.
+  Проверено: все 17 существующих тестов проходят (`asyncio_mode = auto` совместим с 1.x,
+  breaking changes major-релиза не затрагивают наш код).
+
 ### Added
 - **Docs-коррекция защиты `main`** (этот PR): убраны упоминания server-side branch protection из SPEC §21.8 / §20 и README. В SPEC §21.8 добавлен Decision-блок с отклонёнными альтернативами (GitHub Pro, публикация репо) и принимаемыми рисками. В §20 пункт «Branch protection для `main`» помечен как закрытый со ссылкой на §21.8. Формулировки в CHANGELOG Unreleased приведены в соответствие («двойная защита» → «единственный уровень»). Follow-up к #28, к вопросу server-side BP не возвращаемся.
 - **Pre-push git hook** (`scripts/git-hooks/pre-push`): блокирует прямой `git push` в ветку `main` локально, до отправки на GitHub. Это **единственный уровень защиты** ветки `main` — server-side branch protection не используется (free private tier, см. Decisions ниже). Устанавливается через `scripts/setup-hooks.sh`.
