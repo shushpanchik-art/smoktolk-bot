@@ -62,7 +62,7 @@
 ### Known issues / TODO
 
 - Добавить `pytest-cov` и coverage-бейдж в README (отдельный PR).
-- Добавить unit-тесты для критичных функций `add_purchase` и `recalc_level` (сейчас покрыт только `bump_daily` из трёх; `tests/test_age_verify.py`, `tests/test_bump_daily.py`, `tests/test_points.py` существуют).
+- Добавить unit-тесты для критичных функций `register_purchase` и `recalc_level` (сейчас существуют `tests/test_age_verify.py`, `tests/test_bump_daily.py`, `tests/test_points.py`; покрытие финансовой/левел-логики неполное). _Примечание: в коммите 25bbec1 этот пункт был ошибочно записан как `add_purchase` — такой функции в проекте никогда не было, корректное имя — `db.register_purchase` (см. db.py:289)._
 
 ---
 
