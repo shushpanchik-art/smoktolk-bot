@@ -10,6 +10,7 @@ def kb_accept_rules() -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     b.button(text="📜 Прочитать правила", callback_data="show_rules_first")
     b.button(text="✅ Принимаю правила", callback_data="accept_rules")
+    b.button(text="🏬 Магазины", callback_data="store_address")
     b.adjust(1)
     return b.as_markup()
 
@@ -28,12 +29,13 @@ def kb_main(is_admin: bool = False) -> InlineKeyboardMarkup:
     b.button(text="🎁 Подарки", callback_data="gifts_main")
     b.button(text="🛍 Ассортимент", callback_data="catalog_main")
     b.button(text="👥 Пригласить друга", callback_data="referral_main")
+    b.button(text="🏬 Магазины", callback_data="store_address")
     b.button(text="📜 Правила", callback_data="rules_main")
     b.button(text="🆘 Поддержка", callback_data="support_main")
     b.button(text="💸 Списать баллы", callback_data="redeem_start")
     if is_admin:
         b.button(text="🛠 Админ-панель", callback_data="admin_main")
-    b.adjust(2, 2, 2, 1, 1, 1)
+    b.adjust(2, 2, 2, 2, 1, 1)
     return b.as_markup()
 
 
@@ -191,10 +193,11 @@ def kb_admin_user_card(user_id: int) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     b.button(text="➕ Начислить", callback_data=f"adm_pts_add:{user_id}")
     b.button(text="➖ Списать", callback_data=f"adm_pts_sub:{user_id}")
+    b.button(text="🎂 Изменить ДР", callback_data=f"adm_bday_set:{user_id}")
     b.button(text="🔞 Тогл возраст", callback_data=f"adm_age_toggle:{user_id}")
     b.button(text="📜 История", callback_data=f"adm_user_hist:{user_id}")
     b.button(text="« К поиску", callback_data="adm_users")
-    b.adjust(2, 1, 1, 1)
+    b.adjust(2, 1, 1, 1, 1)
     return b.as_markup()
 
 

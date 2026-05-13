@@ -39,6 +39,27 @@ async def _send_welcome_banner(msg: Message) -> None:
 
 
 
+
+async def _send_welcome_disclaimer(msg: Message) -> None:
+    """Отправляет ОДНО сообщение: фото-вывеску с подписью-дисклеймером и
+    кнопками «📜 Прочитать правила» / «🏬 Магазины» / «✅ Принимаю правила».
+
+    Если файл баннера отсутствует — fallback на текстовое сообщение."""
+    caption = DISCLAIMER_TEXT
+    markup = kb.kb_accept_rules()
+    if _WELCOME_BANNER.exists():
+        try:
+            await msg.answer_photo(
+                FSInputFile(str(_WELCOME_BANNER)),
+                caption=caption,
+                reply_markup=markup,
+            )
+            return
+        except Exception as e:
+            log.warning("welcome+disclaimer photo failed, fallback to text: %s", e)
+    await msg.answer(caption, reply_markup=markup)
+
+
 class Reg(StatesGroup):
     awaiting_rules = State()
     awaiting_phone = State()
@@ -80,8 +101,7 @@ async def _start_common(msg: Message, state: FSMContext, referrer_id):
 
     if not user["rules_accepted_at"]:
         await state.set_state(Reg.awaiting_rules)
-        await _send_welcome_banner(msg)
-        await msg.answer(DISCLAIMER_TEXT, reply_markup=kb.kb_accept_rules())
+        await _send_welcome_disclaimer(msg)
         return
 
     if not user["phone"]:
