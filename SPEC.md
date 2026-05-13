@@ -396,8 +396,9 @@ CREATE TABLE users (
 - **Включить 2FA в Termius** — сейчас выключен, аккаунт
   `shushpanchik.art@gmail.com` защищён только паролем; при компрометации
   Termius-аккаунта = доступ ко всем сохранённым SSH-ключам через Sync
-- **Branch protection для `main`** в GitHub — запретить force-push,
-  требовать PR-review (хоть и self-review)
+- ~~**Branch protection для `main`** в GitHub~~ — закрыто как «не внедряется».
+  Решение зафиксировано окончательно: server-side BP недоступна на free private
+  тарифе, используется только локальный pre-push hook (см. §21.8 Decision)
 
 ### 🟡 Средний приоритет
 
@@ -512,7 +513,7 @@ CREATE TABLE users (
 
 ### 21.8 Pre-push hook: защита ветки `main`
 
-GitHub Branch Protection для приватных репозиториев требует платного тарифа (Pro/Team/Enterprise). Чтобы получить функциональный эквивалент защиты ветки на free-тарифе, в проекте реализован локальный git pre-push hook, блокирующий прямой push в `main`.
+GitHub Branch Protection для приватных репозиториев требует платного тарифа (Pro/Team/Enterprise) и в проекте не используется (Decision см. в конце раздела). Для частичной защиты `main` на free-тарифе реализован локальный git pre-push hook, блокирующий прямой push в `main`. Это **не эквивалент** server-side защиты: hook обходится через `--no-verify` и не работает на машине, где не выполнен `setup-hooks.sh`.
 
 **Реализация:**
 
@@ -574,6 +575,20 @@ GitHub Branch Protection для приватных репозиториев тр
 - CI workflow (§21.7) — защищает качество кода и зависимостей.
 
 Три слоя защиты независимы и работают в разное время процесса разработки.
+
+**Decision (зафиксировано окончательно, к вопросу не возвращаемся):**
+
+Server-side GitHub Branch Protection для `main` **НЕ внедряется**. Локальный pre-push hook — **единственный уровень защиты** ветки, а не «дополнительный к серверному».
+
+- **Причина:** GitHub Branch Protection Rules недоступны на текущем плане (free, private repository). Подтверждено через `gh api repos/<owner>/<repo>/branches/main/protection` → HTTP 403: «Upgrade to GitHub Pro or make this repository public to enable this feature.»
+- **Рассмотренные альтернативы (отклонены):**
+  - Upgrade на GitHub Pro (~$4/мес) — отклонено: текущей защиты достаточно для команды из одного контрибьютора.
+  - Сделать репозиторий публичным — отклонено: код содержит логику доменной модели, которую нецелесообразно открывать.
+- **Принимаемые риски:**
+  - push в `main` возможен с машины, где hook не установлен через `setup-hooks.sh`;
+  - push в `main` возможен с явным `git push --no-verify`;
+  - митигация — дисциплина flow и минимальное число контрибьюторов с прямым доступом к репозиторию.
+- **Полная история решения:** CHANGELOG, раздел `[Unreleased] → Decisions`.
 
 ## 22. Termius — рабочий клиент SSH
 

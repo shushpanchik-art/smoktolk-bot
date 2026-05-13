@@ -73,10 +73,11 @@ Telegram-бот для табачного магазина: каталог, за
 
 ### Защита ветки `main`
 
-Ветка `main` защищена на двух уровнях:
+Ветка `main` защищена **только локально** — через git pre-push hook (`scripts/git-hooks/pre-push`), который блокирует прямой `git push` в `main` ещё до отправки на GitHub. Устанавливается через `./scripts/setup-hooks.sh` (см. раздел Setup выше).
 
-1. **Локально** — `scripts/git-hooks/pre-push` блокирует прямой `git push` в `main` ещё до отправки на GitHub. Устанавливается через `./scripts/setup-hooks.sh` (см. раздел Setup выше).
-2. **На сервере** — GitHub branch protection требует pull request с прохождением CI и не разрешает прямой push в `main` (см. SPEC §21.8).
+**Server-side branch protection не используется**: GitHub Branch Protection Rules недоступны на текущем тарифе (free, private repository). Архитектурное решение и отклонённые альтернативы зафиксированы в SPEC §21.8 и CHANGELOG (раздел Decisions) — к вопросу не возвращаемся.
+
+**Принимаемые риски:** прямой push в `main` всё ещё возможен (а) с машины, где hook не установлен через `setup-hooks.sh`, (б) при явном `git push --no-verify`. Митигация — дисциплина flow и минимальное число контрибьюторов с прямым доступом.
 
 Корректный workflow:
 
@@ -91,7 +92,7 @@ Telegram-бот для табачного магазина: каталог, за
 
     git push --no-verify
 
-⚠️ Используй `--no-verify` для push **только** если действительно нужно срочно и согласовано с командой. Server-side protection всё равно отклонит прямой push в `main`.
+⚠️ Используй `--no-verify` для push **только** если действительно нужно срочно и согласовано с командой. Server-side защиты, которая поймала бы такой push на стороне GitHub, **нет** — ответственность полностью на тебе.
 
 ### Обход pre-commit hook (только в крайних случаях)
 

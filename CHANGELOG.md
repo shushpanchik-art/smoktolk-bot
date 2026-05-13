@@ -9,12 +9,13 @@
 ## [Unreleased]
 
 ### Added
-- **Pre-push git hook** (`scripts/git-hooks/pre-push`): блокирует прямой `git push` в ветку `main` локально, до отправки на GitHub. Дополняет server-side branch protection (см. README, раздел «Безопасность»). Устанавливается через `scripts/setup-hooks.sh`.
+- **Docs-коррекция защиты `main`** (этот PR): убраны упоминания server-side branch protection из SPEC §21.8 / §20 и README. В SPEC §21.8 добавлен Decision-блок с отклонёнными альтернативами (GitHub Pro, публикация репо) и принимаемыми рисками. В §20 пункт «Branch protection для `main`» помечен как закрытый со ссылкой на §21.8. Формулировки в CHANGELOG Unreleased приведены в соответствие («двойная защита» → «единственный уровень»). Follow-up к #28, к вопросу server-side BP не возвращаемся.
+- **Pre-push git hook** (`scripts/git-hooks/pre-push`): блокирует прямой `git push` в ветку `main` локально, до отправки на GitHub. Это **единственный уровень защиты** ветки `main` — server-side branch protection не используется (free private tier, см. Decisions ниже). Устанавливается через `scripts/setup-hooks.sh`.
 - **CI workflow на pre-push hook**: добавлен smoke-тест в `.github/workflows/ci.yml`, проверяющий, что hook исполняемый, корректно блокирует push в `main` и пропускает push в фича-ветки.
-- **SPEC §21.8**: документация принципа двойной защиты ветки `main` (локальный hook + server-side branch protection), описание поведения hook, инструкция обхода через `--no-verify` для emergency-кейсов.
+- **SPEC §21.8**: документация защиты ветки `main` через локальный pre-push hook (единственный уровень защиты на free private tier; Decision-блок с отклонёнными альтернативами и принимаемыми рисками), описание поведения hook, инструкция обхода через `--no-verify` для emergency-кейсов.
 - **SPEC §24.7**: принцип «документация как часть Definition of Done» — изменение в коде/конфигурации/процессе не считается завершённым, пока соответствующая документация (SPEC/README/CHANGELOG) не обновлена в том же PR.
 - **SPEC §16**: файл `scripts/git-hooks/pre-push` добавлен в список файлов проекта.
-- **README**: в раздел «Безопасность» добавлен подраздел «Защита ветки `main`» с описанием двухуровневой защиты (pre-push hook + server-side branch protection) и корректного workflow через PR.
+- **README**: в раздел «Безопасность» добавлен подраздел «Защита ветки `main`» с описанием локальной защиты (pre-push hook), явным указанием что server-side BP не используется, перечнем принимаемых рисков и корректного workflow через PR.
 - **Алерт админу о крэше бота** (DOWN / RECOVERED): двусторонние уведомления в Telegram при реальном падении процесса и при успешном восстановлении. Штатные операции (`systemctl restart/stop`, деплой) уведомлений не вызывают.
   - **Архитектура:** два независимых канала через systemd (`ExecStopPost` в drop-in + `OnFailure` на резервный oneshot-юнит) с общим state-файлом `/run/smoktolk-bot/crashed` для идемпотентности (анти-дубликат DOWN при серии крэшей).
   - **RECOVERED отправляется из Python (`crash_alert.py`), а не systemd**, чтобы уведомление уходило только после фактической готовности бота (`init_db` + `get_me` + `catalog.refresh`), а не сразу после fork процесса.
@@ -43,12 +44,11 @@
   - **Рассмотренные альтернативы и почему отклонены:**
     - Upgrade на GitHub Pro (~$4/мес) — отклонено: текущей защиты достаточно для команды из одного контрибьютора.
     - Сделать репозиторий публичным — отклонено: код содержит логику доменной модели, которую нецелесообразно открывать.
-  - **Принятая модель защиты `main`:** только локальный pre-push hook (`scripts/git-hooks/pre-push`), устанавливаемый через `scripts/setup-hooks.sh`. Это **единственный уровень защиты**, не «дополнительный» — формулировка SPEC §21.8 о «двойной защите» подлежит корректировке в следующем PR.
+  - **Принятая модель защиты `main`:** только локальный pre-push hook (`scripts/git-hooks/pre-push`), устанавливаемый через `scripts/setup-hooks.sh`. Это **единственный уровень защиты**, не «дополнительный». Формулировки SPEC §21.8 и README приведены в соответствие (см. запись в Added ниже).
   - **Принимаемые риски:** push в `main` возможен (а) с машины, где hook не установлен через `setup-hooks.sh`, (б) с явным `--no-verify`. Митигация — дисциплина flow и минимальное число контрибьюторов с прямым доступом.
 
 ### Known issues / TODO
 
-- Скорректировать SPEC §21.8 и README раздел «Защита ветки `main`»: убрать упоминания server-side branch protection, явно зафиксировать, что защита локальная и почему (отдельный PR, follow-up к #28).
 - Добавить `pytest-cov` и coverage-бейдж в README (отдельный PR).
 - Добавить unit-тесты для критичных функций `add_purchase` и `recalc_level` (сейчас покрыт только `bump_daily` из трёх; `tests/test_age_verify.py`, `tests/test_bump_daily.py`, `tests/test_points.py` существуют).
 - Решить, что делать с 2 moderate Dependabot alerts на default branch (отдельный chore-PR).
