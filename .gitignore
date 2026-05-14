@@ -41,3 +41,6 @@ htmlcov/
 
 # одноразовые медиа для скриптов (avatr*) — НЕ коммитим
 data/avatr*
+
+# Animated bot avatar (source of truth, see docs/ANIMATED_AVATAR_RECIPE.md)
+!data/avatr2_botpic.mp4
