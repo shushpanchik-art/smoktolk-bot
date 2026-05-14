@@ -1,0 +1,37 @@
+[Unit]
+Description=SMOKTOLK SQLite backup
+Documentation=file:/opt/smoktolk/bot/backup.sh
+Documentation=file:/opt/smoktolk/bot/docs/BACKUP.md
+After=network-online.target
+# Если backup.sh упадёт или будет убит (kill -9 / OOM), systemd
+# запустит alert-юнит как страховку поверх trap ERR внутри скрипта.
+# notify_admin.sh сам проверит state-файл и не отправит дубликат.
+OnFailure=smoktolk-backup-alert.service
+
+[Service]
+Type=oneshot
+User=smoktolk
+Group=smoktolk
+ExecStart=/opt/smoktolk/bot/backup.sh
+
+# Логирование: дублируем в файл (как было с cron) и в journal.
+StandardOutput=append:/opt/smoktolk/bot/logs/backup.log
+StandardError=append:/opt/smoktolk/bot/logs/backup.log
+
+# Persistent state-каталог для alert-state-файла /var/lib/smoktolk-backup/failed.
+# systemd создаёт /var/lib/smoktolk-backup, владелец smoktolk:smoktolk, mode 0775.
+StateDirectory=smoktolk-backup
+StateDirectoryMode=0775
+
+# Резервная копия должна быть быстрой; запас по времени.
+TimeoutStartSec=10min
+
+# Безопасность.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/var/backups/smoktolk /opt/smoktolk/bot/logs /var/lib/smoktolk-backup
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=Daily SMOKTOLK SQLite backup at 04:00
+Documentation=file:/opt/smoktolk/bot/backup.sh
+Documentation=file:/opt/smoktolk/bot/docs/BACKUP.md
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+# Если сервер был выключен в 04:00 — догоним при следующем запуске.
+Persistent=true
+# Случайный jitter ±2 мин, чтобы не совпадать с другими ночными задачами.
+RandomizedDelaySec=2min
+Unit=smoktolk-backup.service
+
+[Install]
+WantedBy=timers.target

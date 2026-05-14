@@ -9,6 +9,46 @@
 ## [Unreleased]
 
 ### Added
+
+- **systemd timer для бэкапа БД** (`smoktolk-backup.timer` + `smoktolk-backup.service`):
+  замена cron-задаче, единый канал логов в journal, `Persistent=true` для догона
+  пропущенных запусков, `RandomizedDelaySec=2min` для разнесения нагрузки.
+- **Telegram-алерты бэкапа** — двухуровневые, по аналогии с DOWN/RECOVERED для
+  основного бота:
+  - 🚨 `backup-failed` — отправляется при первом сбое (из `trap ERR` в `backup.sh`
+    или из `OnFailure=smoktolk-backup-alert.service`).
+  - ✅ `backup-recovered` — отправляется при первом успешном запуске после сбоя.
+- **State-файл** `/var/lib/smoktolk-backup/failed` (через `StateDirectory=` в юните)
+  для защиты от дубликатов алертов — повторные FAILED заблокированы, пока
+  не пройдёт успешный бэкап.
+- Мастер-копии юнитов в репо: `systemd/smoktolk-backup.service`,
+  `systemd/smoktolk-backup.timer`, `systemd/smoktolk-backup-alert.service`.
+
+### Changed
+
+- `scripts/notify_admin.sh` — поддерживает новые reason'ы `backup-failed`
+  и `backup-recovered`, state-каталог теперь параметризуется в зависимости
+  от reason (для `down`/`up` — `/run/smoktolk-bot/`, для `backup-*` —
+  `/var/lib/smoktolk-backup/`).
+- `backup.sh` — добавлен `trap ERR` с вызовом `notify_admin.sh backup-failed`
+  и финальный вызов `notify_admin.sh backup-recovered` при успехе.
+- `docs/BACKUP.md` — раздел `## Cron` заменён на `## Расписание (systemd timer)`,
+  добавлены разделы «Алерты в Telegram» и «Что делать при FAILED-алерте».
+
+### Removed
+
+- Cron-запись `0 4 * * * /opt/smoktolk/bot/backup.sh ...` у пользователя `smoktolk`
+  (мигрировано в `smoktolk-backup.timer`).
+
+### Notes
+
+- Тесты пройдены вручную (happy path / failed / repeated failed / recovered),
+  алерты в TG приходят ровно по одному разу на событие.
+
+---
+
+
+### Added
 - **Ops/Backups**: переписан `backup.sh` — атомарный снимок SQLite через `sqlite3 .backup`,
   hash-дедупликация по `sha256(sqlite3 .dump)`, retention по возрасту (150 дней) и размеру (5 GiB),
   safety-net (контрольная копия раз в 7 дней даже без изменений), lock через `flock -n`,

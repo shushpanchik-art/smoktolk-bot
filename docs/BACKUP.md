@@ -11,11 +11,29 @@
 Владелец: smoktolk:smoktolk.
 Имена: smoktolk_YYYYMMDD_HHMMSS.db
 
-## Cron
+## Расписание (systemd timer)
 
-    0 4 * * * /opt/smoktolk/bot/backup.sh >> /opt/smoktolk/bot/logs/backup.log 2>&1
+Запуском управляет `smoktolk-backup.timer`. Cron больше не используется
+(мигрировано в PR #ops-backup-alerts, 2026-05-14).
 
-Ежедневно в 04:00 MSK от пользователя smoktolk.
+    OnCalendar=*-*-* 04:00:00     # ежедневно в 04:00 MSK
+    Persistent=true               # догнать пропущенный запуск (если сервер был выключен)
+    RandomizedDelaySec=2min       # случайный jitter ±2 мин
+
+Юниты:
+
+| Юнит                                 | Назначение                                          |
+|--------------------------------------|-----------------------------------------------------|
+| `smoktolk-backup.timer`              | расписание                                          |
+| `smoktolk-backup.service`            | запускает `/opt/smoktolk/bot/backup.sh` (oneshot)   |
+| `smoktolk-backup-alert.service`      | OnFailure-страховка: шлёт TG-алерт, если service упал |
+
+Управление:
+
+    sudo systemctl status  smoktolk-backup.timer
+    systemctl list-timers smoktolk-backup.timer
+    sudo systemctl start   smoktolk-backup.service   # запустить вручную
+    sudo journalctl -u     smoktolk-backup.service -n 50 --no-pager
 
 ## Логика "бэкапить только при изменениях"
 
@@ -49,12 +67,18 @@ Lock-файл .backup.lock через flock -n. Параллельный зап�
 
 ## Ручной запуск
 
+Через systemd (предпочтительно — единый канал логов и алертов):
+
+    sudo systemctl start smoktolk-backup.service
+
+Напрямую (для отладки):
+
     sudo -u smoktolk /opt/smoktolk/bot/backup.sh
 
 Принудительный (даже при совпадении хеша):
 
     sudo -u smoktolk rm /var/backups/smoktolk/.last_dump.sha256
-    sudo -u smoktolk /opt/smoktolk/bot/backup.sh
+    sudo systemctl start smoktolk-backup.service
 
 ## Восстановление
 
@@ -71,6 +95,44 @@ SAFETY_NET_DAYS, LOCK_FILE.
 
 ## Мониторинг
 
+Свежий бэкап есть за последние 2 суток?
+
     find /var/backups/smoktolk -name 'smoktolk_*.db' -mtime -2 | head -1
 
-Пустой вывод = последний бэкап старше 2 дней, что-то не так.
+Пустой вывод = последний бэкап старше 2 дней — что-то не так. См. также
+раздел «Алерты» ниже.
+
+## Алерты в Telegram
+
+Алерты идут в чат админа (ADMIN_ID) через `scripts/notify_admin.sh`.
+
+| Событие         | Reason             | Когда отправляется                                              |
+|-----------------|--------------------|-----------------------------------------------------------------|
+| 🚨 FAILED       | `backup-failed`    | `backup.sh` упал (trap ERR) ИЛИ сервис ушёл в failed (OnFailure) |
+| ✅ RECOVERED    | `backup-recovered` | Очередной успешный бэкап после состояния failed                 |
+
+Защита от дубликатов — state-файл `/var/lib/smoktolk-backup/failed`:
+
+- Первый сбой → файл создан, FAILED-алерт отправлен.
+- Повторные сбои → файл уже есть, новые FAILED-алерты не шлются.
+- Успешный запуск → файл удалён + один RECOVERED-алерт.
+
+State-каталог `/var/lib/smoktolk-backup/` создаётся systemd через
+директиву `StateDirectory=` (владелец smoktolk:smoktolk, права 0775).
+
+### Что делать при FAILED-алерте
+
+1. `sudo systemctl status smoktolk-backup.service`
+2. `sudo tail -50 /opt/smoktolk/bot/logs/backup.log`
+3. `sudo journalctl -u smoktolk-backup.service -n 100 --no-pager`
+
+Типовые причины: нет места на диске; повреждение БД (sqlite3 integrity check
+внутри backup.sh); права на каталоги; пропавший /var/lib/smoktolk-backup.
+
+После починки запускаем вручную: `sudo systemctl start smoktolk-backup.service`.
+Если успешно — придёт RECOVERED.
+
+## Связанные документы
+
+- SPEC §15 — Бэкапы БД (логика, инкременты)
+- SPEC §15.7 — systemd timer + Telegram-алерты (этот документ — операционный)

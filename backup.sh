@@ -2,26 +2,17 @@
 # ============================================================================
 # backup.sh - ezhednevnyy bekap SQLite-bazy SMOKTOLK-bota.
 #
-# Zapuskaetsya po cron (smoktolk user) ezhednevno v 04:00:
-#   0 4 * * * /opt/smoktolk/bot/backup.sh >> /opt/smoktolk/bot/logs/backup.log 2>&1
+# Zapuskaetsya systemd-taymerom smoktolk-backup.timer ezhednevno v 04:00.
+# Logi: /opt/smoktolk/bot/logs/backup.log (via StandardOutput=append:...)
 #
-# Logika:
-#   1. Cherez sqlite3 .backup sozdaem atomarnyy snimok BD vo vremennyy fayl
-#      (bezopasno pri rabotayushchem bote).
-#   2. Schitaem SHA-256 ot SQL-dampa novogo snimka.
-#   3. Sravnivaem s SHA-256 predydushchego bekapa (.last_dump.sha256).
-#      - Esli khesh sovpal I posledniy bekap molozhe SAFETY_NET_DAYS -> propuskaem.
-#      - Inache sokhranyaem snimok kak smoktolk_YYYYMMDD_HHMMSS.db.
-#   4. Primenyaem retenshn:
-#      - udalyaem fayly starshe RETENTION_DAYS;
-#      - esli summarnyy razmer vse eshche > MAX_TOTAL_BYTES - udalyaem samye
-#        starye v okne retenshna, poka ne ulozhimsya.
-#   5. Ispolzuem lock-fayl (flock), chtoby predydushchiy zapusk ne peresekalsya
-#      s tekushchim (na sluchay dolgogo .dump na bolshoy BD).
-#
-# ENV-pereopredeleniya (dlya testov):
-#   BOT_DIR, DB_PATH, BACKUP_DIR, RETENTION_DAYS, MAX_TOTAL_BYTES,
-#   SAFETY_NET_DAYS, LOCK_FILE.
+# Alertovaya semantika:
+#   - Pri lyuboy oshibke (die / non-zero exit) trap ERR vyzyvaet
+#     notify_admin.sh backup-failed -> sozdaet state-fayl i shlet alert.
+#   - Pri uspeshnom zavershenii zaprashivaem backup-recovered, kotoryy
+#     sam reshit: esli state-fayl est' - poslat RECOVERED i udalit ego.
+#   - systemd-yunit smoktolk-backup-alert.service (cherez OnFailure=) -
+#     dopolnitelnaya strakhovka, esli backup.sh upadet do trap ERR
+#     (naprimer, OOM, kill -9, oshibka set -u v samom nachale).
 # ============================================================================
 
 set -euo pipefail
@@ -34,6 +25,7 @@ RETENTION_DAYS="${RETENTION_DAYS:-150}"
 MAX_TOTAL_BYTES="${MAX_TOTAL_BYTES:-5368709120}"   # 5 GiB
 SAFETY_NET_DAYS="${SAFETY_NET_DAYS:-7}"
 LOCK_FILE="${LOCK_FILE:-$BACKUP_DIR/.backup.lock}"
+NOTIFY_SCRIPT="${NOTIFY_SCRIPT:-$BOT_DIR/scripts/notify_admin.sh}"
 
 HASH_FILE="$BACKUP_DIR/.last_dump.sha256"
 DATE="$(date +%Y%m%d_%H%M%S)"
@@ -44,6 +36,22 @@ BACKUP_GLOB="${BACKUP_PREFIX}*.db"
 log() {
     printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S %Z')" "$*"
 }
+
+# --- Alertovyy trap ---
+# Sleetsya odin raz pri lyuboy oshibke (set -e). Vnutri trap'a otklyuchaem
+# set -e, chtoby oshibka v notify_admin.sh ne meshala vyyti s pravilnym kodom.
+notify_failure() {
+    local rc=$?
+    set +e
+    log "ERROR: backup zavershilsya s kodom $rc, otpravlyayu alert"
+    if [ -x "$NOTIFY_SCRIPT" ]; then
+        "$NOTIFY_SCRIPT" backup-failed || log "WARN: notify_admin.sh backup-failed sam upal (rc=$?)"
+    else
+        log "WARN: $NOTIFY_SCRIPT ne ispolnyaem ili otsutstvuyet - alert ne otpravlen"
+    fi
+    exit "$rc"
+}
+trap notify_failure ERR
 
 die() {
     log "ERROR: $*"
@@ -71,6 +79,8 @@ mkdir -p "$BACKUP_DIR"
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
     log "WARN: predydushchiy zapusk eshche rabotaet (lock=$LOCK_FILE), vykhozhu"
+    # Eto NE oshibka - drugoy ekzemplyar uzhe rabotaet, prosto vyhodim 0.
+    # ERR-trap ne srabotayet, recovery ne nuzhen.
     exit 0
 fi
 
@@ -155,5 +165,12 @@ fi
 TOTAL_FILES="$(find "$BACKUP_DIR" -maxdepth 1 -name "$BACKUP_GLOB" -type f | wc -l)"
 TOTAL_BYTES="$(total_size "$BACKUP_DIR" "$BACKUP_GLOB")"
 log "stats: files=$TOTAL_FILES, total_size=${TOTAL_BYTES}B"
+
+# --- Recovery-uvedomlenie ---
+# Snimaem ERR-trap, chtoby oshibka v notify_admin.sh ne triggerila backup-failed.
+trap - ERR
+if [ -x "$NOTIFY_SCRIPT" ]; then
+    "$NOTIFY_SCRIPT" backup-recovered || log "WARN: notify_admin.sh backup-recovered upal (rc=$?), no bekap uspeshen"
+fi
 
 exit 0
