@@ -1054,3 +1054,32 @@ Server-side GitHub Branch Protection для `main` **НЕ внедряется**
     слой `db.set_birthday`.
 - [ ] Кнопка «🚫 Заблокировать юзера» в админ-карточке.
 
+### 26.K Уведомления админу (services/admin_notify) — РЕАЛИЗОВАНО 2026-05-14
+
+**Цель:** админ должен получать push о ключевых событиях бота, чтобы:
+- видеть рост базы в реальном времени,
+- быстро реагировать на подозрительные регистрации,
+- иметь канал для будущих алертов (level-up, рефералки, статистика).
+
+**Что сделано (PR #42):**
+- Новый модуль `services/admin_notify.py` с функциями:
+  - `notify_admin_new_user(bot, user, referrer)` — async, возвращает bool;
+  - `notify_admin_new_user_bg(...)` — fire-and-forget обёртка через `asyncio.create_task`.
+- Вызов встроен в `handlers/start._start_common` сразу после `db.create_user`.
+- HTML-escape всех пользовательских данных (`html.escape`) — защита от инъекций.
+- Сбои Telegram API (`TelegramAPIError`) и любые `Exception` логируются, но не пробрасываются — регистрация юзера НЕ ломается.
+
+**Архитектурный принцип:** `db.create_user` остаётся чистым data-слоем; интеграция с Telegram API живёт в `services/`.
+
+**Что ещё можно повесить на этот модуль (TODO):**
+- [ ] `notify_admin_level_up(user, new_level)` — апгрейд уровня (P1.C)
+- [ ] `notify_admin_daily_stats()` — крон 23:00 МСК (P2.E)
+- [ ] `notify_admin_referral(referrer, new_user, bonus)` — успешный реферал с бонусом (P2.F)
+
+**Тесты:** `tests/test_admin_notify.py` — 9 кейсов:
+- форматтеры `_fmt_user` (с/без username, HTML-escape),
+- форматтеры `_fmt_referrer` (None / с данными),
+- mock `bot.send_message` — позиционные/keyword args, parse_mode,
+- `TelegramAPIError` → возвращает False, не падает,
+- пустой `user` → send_message не вызывается.
+
