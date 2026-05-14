@@ -69,6 +69,7 @@ Telegram-бот для табачного магазина: каталог, за
 - **gitleaks** проверяет каждый коммит локально (pre-commit hook)
 - **pre-push hook** блокирует прямой `git push` в ветку `main` (см. подраздел «Защита ветки `main`» ниже)
 - **Dependabot** еженедельно проверяет зависимости на уязвимости
+- **Бэкапы БД**: ежедневный cron `backup.sh` в 04:00 MSK от user `smoktolk` (`/var/backups/smoktolk/`), hash-дедупликация, retention 150 дней / 5 GiB, lock через `flock`. См. `docs/BACKUP.md` и SPEC §15
 - Если pre-commit hook нашёл секрет — коммит отменяется
 
 ### Защита ветки `main`
