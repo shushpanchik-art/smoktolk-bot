@@ -8,8 +8,13 @@
 
 ## [Unreleased]
 
-### Added
+_Здесь будут изменения для следующего релиза._
 
+---
+
+## [0.3.0] — 2026-05-14
+
+### Added
 - **Healthcheck-таймер бэкапов** (`smoktolk-backup-healthcheck.timer` в 10:00 MSK):
   проверяет, что в `/var/backups/smoktolk/` есть файл младше 36 часов;
   если нет — шлёт алерт через `notify_admin.sh backup-failed`. Защищает от
@@ -32,31 +37,6 @@
 - Мастер-копии юнитов в репо: `systemd/smoktolk-backup.service`,
   `systemd/smoktolk-backup.timer`, `systemd/smoktolk-backup-alert.service`.
 
-### Changed
-
-- `scripts/notify_admin.sh` — поддерживает новые reason'ы `backup-failed`
-  и `backup-recovered`, state-каталог теперь параметризуется в зависимости
-  от reason (для `down`/`up` — `/run/smoktolk-bot/`, для `backup-*` —
-  `/var/lib/smoktolk-backup/`).
-- `backup.sh` — добавлен `trap ERR` с вызовом `notify_admin.sh backup-failed`
-  и финальный вызов `notify_admin.sh backup-recovered` при успехе.
-- `docs/BACKUP.md` — раздел `## Cron` заменён на `## Расписание (systemd timer)`,
-  добавлены разделы «Алерты в Telegram» и «Что делать при FAILED-алерте».
-
-### Removed
-
-- Cron-запись `0 4 * * * /opt/smoktolk/bot/backup.sh ...` у пользователя `smoktolk`
-  (мигрировано в `smoktolk-backup.timer`).
-
-### Notes
-
-- Тесты пройдены вручную (happy path / failed / repeated failed / recovered),
-  алерты в TG приходят ровно по одному разу на событие.
-
----
-
-
-### Added
 - **Ops/Backups**: переписан `backup.sh` — атомарный снимок SQLite через `sqlite3 .backup`,
   hash-дедупликация по `sha256(sqlite3 .dump)`, retention по возрасту (150 дней) и размеру (5 GiB),
   safety-net (контрольная копия раз в 7 дней даже без изменений), lock через `flock -n`,
@@ -74,7 +54,7 @@
   TelegramAPIError).
 - **UX**: единое welcome-сообщение для нового пользователя — фото-вывеска SMOKTOLK + текст дисклеймера в одном сообщении (вместо двух раздельных). См. `handlers/start._send_welcome_disclaimer`.
 - **UX**: раздел «🏬 Магазины» (бывш. «📍 Адрес и часы работы») доступен ДО принятия правил — кнопка на экране дисклеймера. Возврат — на тот же экран.
-- **UX**: в главном меню новая раскладка кнопок:
+- **UX**: в главном меню новая раскладка кнопок — layout `adjust(2,2,2,2,1,1)` (детали см. в `### Changed`).
 - **Admin**: кнопка «🎂 Изменить ДР» в карточке пользователя. Позволяет админу
 установить/перезаписать дату рождения юзера (`db.set_birthday(..., force=True)`).
 Формат ввода: `ДД.ММ.ГГГГ`. См. `handlers/_admin_addon.AdmBday` FSM.
@@ -82,6 +62,15 @@
 (было «◀️ В меню»).
 
 ### Changed
+- `scripts/notify_admin.sh` — поддерживает новые reason'ы `backup-failed`
+  и `backup-recovered`, state-каталог теперь параметризуется в зависимости
+  от reason (для `down`/`up` — `/run/smoktolk-bot/`, для `backup-*` —
+  `/var/lib/smoktolk-backup/`).
+- `backup.sh` — добавлен `trap ERR` с вызовом `notify_admin.sh backup-failed`
+  и финальный вызов `notify_admin.sh backup-recovered` при успехе.
+- `docs/BACKUP.md` — раздел `## Cron` заменён на `## Расписание (systemd timer)`,
+  добавлены разделы «Алерты в Telegram» и «Что делать при FAILED-алерте».
+
 - `handlers/address.py`: переписан, теперь определяет контекст (из дисклеймера
 vs из главного меню) по полю `user.rules_accepted_at` и подставляет
 правильный callback возврата (`back_to_rules` или `back_main`).
@@ -91,6 +80,10 @@ vs из главного меню) по полю `user.rules_accepted_at` и п�
 - `keyboards.kb_admin_user_card`: добавлена строка с кнопкой «🎂 Изменить ДР»,
 layout `adjust(2,1,1,1,1)`.
 
+### Removed
+- Cron-запись `0 4 * * * /opt/smoktolk/bot/backup.sh ...` у пользователя `smoktolk`
+  (мигрировано в `smoktolk-backup.timer`).
+
 ### Verified
 | Сценарий | Результат |
 |----------|-----------|
@@ -99,7 +92,7 @@ layout `adjust(2,1,1,1,1)`.
 | Тап «✅ Принимаю правила» → главное меню с новой раскладкой | ✅ |
 | Главное меню «🏬 Магазины» → адрес → «« Назад» → главное меню | ✅ |
 | Админ → карточка юзера → «🎂 Изменить ДР» → ввод `15.03.1990` → сохранено как `1990-03-15` | ✅ |
-| `pytest` | ✅ 36/36 |
+| `pytest` | ✅ 53/53 |
 | `_send_welcome_disclaimer` существует и шлёт одно сообщение с фото+caption | ✅ |
 
 ### Technical debt closed
@@ -108,6 +101,11 @@ layout `adjust(2,1,1,1,1)`.
 - ~~Админ не мог исправить ошибочно введённую юзером ДР~~ — теперь может через
 карточку пользователя.
 
+### Notes
+- Тесты пройдены вручную (happy path / failed / repeated failed / recovered),
+  алерты в TG приходят ровно по одному разу на событие.
+
+---
 
 ## [0.2.2] — 2026-05-12
 
