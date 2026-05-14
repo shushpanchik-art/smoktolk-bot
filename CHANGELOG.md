@@ -9,6 +9,15 @@
 ## [Unreleased]
 
 ### Added
+- **Ops/Backups**: переписан `backup.sh` — атомарный снимок SQLite через `sqlite3 .backup`,
+  hash-дедупликация по `sha256(sqlite3 .dump)`, retention по возрасту (150 дней) и размеру (5 GiB),
+  safety-net (контрольная копия раз в 7 дней даже без изменений), lock через `flock -n`,
+  ENV-override всех путей для тестов (`BOT_DIR`, `DB_PATH`, `BACKUP_DIR`, `RETENTION_DAYS`,
+  `MAX_TOTAL_BYTES`, `SAFETY_NET_DAYS`, `LOCK_FILE`). Бэкапы переехали из
+  `/opt/smoktolk/bot/backups/` в `/var/backups/smoktolk/` (вне директории приложения).
+  Добавлен operations-док `docs/BACKUP.md` (что бэкапим, восстановление, мониторинг)
+  и 8 интеграционных тестов `tests/test_backup_sh.py` через `subprocess.run` —
+  без зависимости от bats. SPEC §15 полностью переписан.
 - **Admin notify**: push админу при каждой новой регистрации пользователя.
   Сообщение: имя, @username, user_id, реферер (если есть). Реализовано через
   новый модуль `services/admin_notify.py` (fire-and-forget, асинхронно,
