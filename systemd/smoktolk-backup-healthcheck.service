@@ -1,0 +1,16 @@
+[Unit]
+Description=SMOKTOLK backup freshness healthcheck
+Documentation=file:/opt/smoktolk/bot/scripts/backup_healthcheck.sh
+Documentation=file:/opt/smoktolk/bot/docs/BACKUP.md
+After=network.target
+
+[Service]
+Type=oneshot
+User=smoktolk
+Group=smoktolk
+ExecStart=/opt/smoktolk/bot/scripts/backup_healthcheck.sh
+# Скрипт сам зовёт notify_admin.sh при FAIL, OnFailure не нужен —
+# был бы дубликат. Но если упадёт сам healthcheck (например, sh-ошибка),
+# systemd залогирует в journal — этого достаточно.
+StandardOutput=journal
+StandardError=journal

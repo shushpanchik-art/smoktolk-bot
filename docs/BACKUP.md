@@ -136,3 +136,52 @@ State-каталог `/var/lib/smoktolk-backup/` создаётся systemd че
 
 - SPEC §15 — Бэкапы БД (логика, инкременты)
 - SPEC §15.7 — systemd timer + Telegram-алерты (этот документ — операционный)
+
+
+## Healthcheck свежести
+
+Параллельно с основным бэкапом работает healthcheck-таймер, который проверяет,
+что в `/var/backups/smoktolk/` есть файл младше 36 часов.
+
+| Юнит                                       | Когда         | Что делает |
+|--------------------------------------------|---------------|------------|
+| `smoktolk-backup-healthcheck.timer`        | 10:00 MSK     | расписание |
+| `smoktolk-backup-healthcheck.service`      | (oneshot)     | запускает `scripts/backup_healthcheck.sh` |
+
+Скрипт `scripts/backup_healthcheck.sh`:
+- ищет `smoktolk_*.db` младше `MAX_AGE_HOURS=36` через `find -mmin`;
+- если такого нет — зовёт `scripts/notify_admin.sh backup-failed` и завершается с кодом 1;
+- если есть — пишет OK в journal и выходит с 0.
+
+Зачем это нужно при наличии `OnFailure=` в основном `smoktolk-backup.service`:
+`OnFailure` ловит сценарий "service запустился и упал". Healthcheck ловит
+сценарий "timer вообще не сработал" (юнит выключен, systemd сошёл с ума,
+диск размонтировался) — это другая угроза, дополняющая основной механизм.
+
+Управление:
+
+    sudo systemctl status smoktolk-backup-healthcheck.timer
+    sudo systemctl start  smoktolk-backup-healthcheck.service
+    sudo journalctl -u    smoktolk-backup-healthcheck.service -n 50 --no-pager
+
+## DR-drill (учения по восстановлению)
+
+Раз в квартал нужно проверять, что бэкап реально пригоден к восстановлению.
+Минимальная процедура (около 1 минуты):
+
+DRILL=$(mktemp -d)
+cp "(ls−t/var/backups/smoktolk/smoktolk∗.db∣head−1)""DRILL/restored.db"
+sqlite3 "$DRILL/restored.db" 'PRAGMA integrity_check;'
+sqlite3 "$DRILL/restored.db" '.tables'
+sqlite3 "$DRILL/restored.db" 'SELECT COUNT(*) FROM users;'
+rm -rf "$DRILL"
+
+
+Полная процедура (с реальным запуском бота на восстановленной БД) — TODO,
+делается при первой серьёзной миграции схемы.
+
+### История drill'ов
+
+| Дата       | Результат | Заметки |
+|------------|-----------|---------|
+| 2026-05-14 | OK        | integrity_check=ok, все 8 таблиц на месте, users=5 (совпадает с prod) |

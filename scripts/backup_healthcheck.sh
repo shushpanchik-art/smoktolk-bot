@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Healthcheck свежести бэкапов SMOKTOLK.
+#
+# Запускается отдельным systemd timer (smoktolk-backup-healthcheck.timer)
+# в 10:00 MSK — через 6 часов после основного бэкапа в 04:00.
+# Если в /var/backups/smoktolk/ нет файла младше 36 часов — шлёт алерт
+# через scripts/notify_admin.sh backup-failed.
+#
+# Зачем это нужно, если есть OnFailure= в smoktolk-backup.service:
+# OnFailure ловит ситуацию "service запустился и упал". Этот healthcheck
+# ловит ситуацию "timer вообще не сработал" (например, кто-то выключил
+# юнит, systemd сошёл с ума, диск размонтировался).
+#
+# ENV-override для тестов:
+#   BACKUP_DIR (default: /var/backups/smoktolk)
+#   MAX_AGE_HOURS (default: 36)
+#   NOTIFY_SCRIPT (default: /opt/smoktolk/bot/scripts/notify_admin.sh)
+
+set -euo pipefail
+
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/smoktolk}"
+MAX_AGE_HOURS="${MAX_AGE_HOURS:-36}"
+NOTIFY_SCRIPT="${NOTIFY_SCRIPT:-/opt/smoktolk/bot/scripts/notify_admin.sh}"
+
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] healthcheck: $*"; }
+
+# find -mmin принимает минуты. 36h = 2160min.
+max_age_min=$(( MAX_AGE_HOURS * 60 ))
+
+if [ ! -d "$BACKUP_DIR" ]; then
+    log "ERROR: BACKUP_DIR не существует: $BACKUP_DIR"
+    "$NOTIFY_SCRIPT" backup-failed "healthcheck: $BACKUP_DIR not found" || true
+    exit 1
+fi
+
+# Свежий файл = бэкап младше MAX_AGE_HOURS
+fresh=$(find "$BACKUP_DIR" -maxdepth 1 -name 'smoktolk_*.db' -mmin "-${max_age_min}" -print -quit 2>/dev/null || true)
+
+if [ -z "$fresh" ]; then
+    log "FAIL: нет бэкапа младше ${MAX_AGE_HOURS}ч в $BACKUP_DIR"
+    "$NOTIFY_SCRIPT" backup-failed "healthcheck: no fresh backup (<${MAX_AGE_HOURS}h)" || true
+    exit 1
+fi
+
+log "OK: свежий бэкап найден — $(basename "$fresh")"
+exit 0

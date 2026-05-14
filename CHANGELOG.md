@@ -10,6 +10,14 @@
 
 ### Added
 
+- **Healthcheck-таймер бэкапов** (`smoktolk-backup-healthcheck.timer` в 10:00 MSK):
+  проверяет, что в `/var/backups/smoktolk/` есть файл младше 36 часов;
+  если нет — шлёт алерт через `notify_admin.sh backup-failed`. Защищает от
+  сценария "timer не сработал вообще" (юнит выключен, диск размонтирован),
+  который не покрывается существующим `OnFailure=`. Скрипт:
+  `scripts/backup_healthcheck.sh`, юниты: `systemd/smoktolk-backup-healthcheck.{service,timer}`.
+- **DR-drill процедура** в `docs/BACKUP.md` + первая запись в журнале
+  учений (2026-05-14, integrity_check=ok, схема совпадает с prod).
 - **systemd timer для бэкапа БД** (`smoktolk-backup.timer` + `smoktolk-backup.service`):
   замена cron-задаче, единый канал логов в journal, `Persistent=true` для догона
   пропущенных запусков, `RandomizedDelaySec=2min` для разнесения нагрузки.
