@@ -243,6 +243,61 @@ find /var/backups/smoktolk -name 'smoktolk_*.db' -mtime -2 | head -1
 - 2026-05-14: переписан `backup.sh` (PR #44) — hash-dedup, retention, lock, ENV-override, тесты. Прежняя версия делала только `sqlite3 .backup` + `cp catalog.xlsx` без проверок и без lock'а, хранила «30 копий каждого».
 - Ручные tar-бэкапы перед крупными изменениями кода: `/opt/smoktolk/backup_YYYYMMDD_HHMM.tar.gz` (вручную, не cron).
 
+### 15.7 systemd timer + Telegram-алерты (PR #ops-backup-alerts, 2026-05-14)
+
+Перенесли запуск бэкапа с cron на systemd timer и добавили двухуровневые
+алерты в Telegram (по аналогии с DOWN/RECOVERED для основного бота, §25).
+
+**Юниты** (мастер-копии в `systemd/`, развёрнуты в `/etc/systemd/system/`):
+
+- `smoktolk-backup.timer` — `OnCalendar=*-*-* 04:00:00`, `Persistent=true`,
+  `RandomizedDelaySec=2min`.
+- `smoktolk-backup.service` — `Type=oneshot`, `User=smoktolk`, запускает
+  `/opt/smoktolk/bot/backup.sh`. Использует `StateDirectory=smoktolk-backup`
+  → systemd создаёт `/var/lib/smoktolk-backup/` (для state-файла алертов).
+  `OnFailure=smoktolk-backup-alert.service`.
+- `smoktolk-backup-alert.service` — `Type=oneshot`, `User=smoktolk`,
+  вызывает `notify_admin.sh backup-failed`. Срабатывает только если
+  основной service ушёл в failed (страховка от kill -9 / OOM).
+
+**Преимущества перед cron**:
+
+- Все логи в одном `journalctl -u smoktolk-backup.service`.
+- Можно запустить вручную: `systemctl start smoktolk-backup.service`.
+- `Persistent=true` — догоним пропущенный запуск (например, после ребута).
+- `RandomizedDelaySec` — снижает риск конкуренции за ресурсы с другими
+  ночными задачами.
+
+**Telegram-алерты** (`scripts/notify_admin.sh`):
+
+| Reason             | Источник                                   | Что отправляет          |
+|--------------------|--------------------------------------------|-------------------------|
+| `backup-failed`    | `trap ERR` в `backup.sh` И `OnFailure=`    | 🚨 SMOKTOLK backup FAILED |
+| `backup-recovered` | `backup.sh` в конце успешного запуска      | ✅ SMOKTOLK backup восстановлен |
+
+**Защита от дубликатов** — state-файл `/var/lib/smoktolk-backup/failed`.
+Первый алерт создаёт файл; повторные срабатывания (включая параллельные
+вызовы из `trap ERR` и `OnFailure=`) видят файл и тихо выходят.
+Успешный запуск удаляет файл и отправляет один RECOVERED-алерт.
+
+**Тесты пройдены** (2026-05-14):
+
+1. Happy path → exit 0, в TG ничего.
+2. Симулированный сбой (`Environment=DB_PATH=/nonexistent/...` через
+   drop-in override) → FAILED ровно 1 раз, state-файл создан.
+3. Повторный сбой → state-файл существует, дубликат заблокирован.
+4. Снятие override → RECOVERED 1 раз, state-файл удалён.
+
+**Изменения в `scripts/notify_admin.sh`**:
+
+- Reason `backup-failed`/`backup-recovered` добавлены наряду с `down`/`up`.
+- State-каталог теперь параметризуется: для `backup-*` это
+  `/var/lib/smoktolk-backup/`, для `down`/`up` — `/run/smoktolk-bot/`
+  (как было).
+
+**Документация**: операционная инструкция в `docs/BACKUP.md` (раздел
+«Алерты в Telegram» и «Что делать при FAILED-алерте»).
+
 ## 16. Файлы проекта
 
 ```

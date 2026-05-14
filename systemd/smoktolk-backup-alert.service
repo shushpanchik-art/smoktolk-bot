@@ -1,0 +1,22 @@
+[Unit]
+Description=Send Telegram alert when SMOKTOLK backup fails
+Documentation=file:/opt/smoktolk/bot/docs/BACKUP.md
+# Этот юнит вызывается через OnFailure= из smoktolk-backup.service.
+# У него НЕТ собственного OnFailure=, чтобы не зациклить алерты,
+# если сам notify_admin.sh упадёт (например, нет сети до TG).
+
+[Service]
+Type=oneshot
+User=smoktolk
+Group=smoktolk
+ExecStart=/opt/smoktolk/bot/scripts/notify_admin.sh backup-failed
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=30s
+
+# Тот же state-каталог, что и у основного юнита — общий /var/lib/smoktolk-backup.
+StateDirectory=smoktolk-backup
+StateDirectoryMode=0775
+
+NoNewPrivileges=yes
+PrivateTmp=yes
