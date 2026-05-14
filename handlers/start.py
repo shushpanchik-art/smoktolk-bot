@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 # Welcome-баннер: показывается при каждом /start (и новичкам, и вернувшимся).
 # Файл лежит локально, в .gitignore — поэтому шлём как FSInputFile.
 from pathlib import Path as _Path
+from services.admin_notify import notify_admin_new_user_bg
 _WELCOME_BANNER = _Path(__file__).resolve().parent.parent / "data" / "signboard_hor.jpg"
 _WELCOME_CAPTION = (
     "🏪 <b>SMOKTOLK</b>\n"
@@ -91,6 +92,17 @@ async def _start_common(msg: Message, state: FSMContext, referrer_id):
             msg.from_user.full_name or "",
             referrer_id=referrer_id,
         )
+        # Уведомить админа о новой регистрации (fire-and-forget).
+        # SPEC §26: push при каждом новом пользователе.
+        try:
+            referrer_user = None
+            if referrer_id:
+                referrer_user = await db.get_user(referrer_id)
+            notify_admin_new_user_bg(msg.bot, user, referrer_user)
+        except Exception as _e:
+            import logging as _lg
+            _lg.getLogger(__name__).exception('notify_admin failed: %s', _e)
+
         await db.bump_daily("new_users")
     else:
         await db.update_user_meta(
