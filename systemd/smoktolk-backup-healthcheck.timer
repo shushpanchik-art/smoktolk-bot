@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily SMOKTOLK backup freshness check at 10:00
+Documentation=file:/opt/smoktolk/bot/scripts/backup_healthcheck.sh
+
+[Timer]
+OnCalendar=*-*-* 10:00:00
+Persistent=true
+RandomizedDelaySec=2min
+Unit=smoktolk-backup-healthcheck.service
+
+[Install]
+WantedBy=timers.target

@@ -170,7 +170,7 @@ LOG_LEVEL=INFO
 ⚠️ Никогда не коммитить `.env` — проверка через gitleaks (см. раздел 21.4)
 ⚠️ Никогда не отправлять `.env` ассистенту (см. раздел 0)
 
-## 15. Бэкапы БД (cron + `backup.sh`)
+## 15. Бэкапы БД (systemd timer + `backup.sh`)
 
 **Что бэкапим:** только SQLite-БД `/opt/smoktolk/bot/data/smoktolk.db`.
 Каталог товаров (`data/catalog.xlsx`) — НЕ бэкапим: первоисточник на Я.Диске,
@@ -179,11 +179,7 @@ LOG_LEVEL=INFO
 **Куда:** `/var/backups/smoktolk/` (вне директории приложения).
 Владелец `smoktolk:smoktolk`. Имена: `smoktolk_YYYYMMDD_HHMMSS.db`.
 
-**Когда:** crontab пользователя `smoktolk`, ежедневно в 04:00 MSK:
-
-```
-0 4 * * * /opt/smoktolk/bot/backup.sh >> /opt/smoktolk/bot/logs/backup.log 2>&1
-```
+**Когда:** ежедневно в 04:00 MSK через `smoktolk-backup.timer` (см. §15.7). Cron больше не используется (мигрировано 2026-05-14).
 
 ### 15.1 Логика `backup.sh` (PR #44, 2026-05-14)
 
@@ -231,10 +227,10 @@ find /var/backups/smoktolk -name 'smoktolk_*.db' -mtime -2 | head -1
 
 ### 15.5 Открытые улучшения (см. §20 Roadmap)
 
-- ⬜ **Алерт в Telegram при сбое cron** — переезд с `crontab` на systemd timer с `OnFailure=`, переиспользовать `smoktolk-bot-alert.service`.
+- ✅ ~~**Алерт в Telegram при сбое cron**~~ — закрыто 2026-05-14 в §15.7 (systemd timer + двухуровневые алерты).
 - ⬜ **Off-site копия** — rsync/rclone на S3 / второй VPS. Локальный диск может умереть полностью.
 - ⬜ **DR-drill** — раз в квартал восстанавливать бэкап в staging и проверять старт бота.
-- ⬜ **Healthcheck cron в 10:00** — обернуть команду из §15.4 в скрипт с алертом в Telegram.
+- ✅ ~~**Healthcheck cron в 10:00**~~ — закрыто 2026-05-14: `smoktolk-backup-healthcheck.timer` + `scripts/backup_healthcheck.sh` с алертом через `notify_admin.sh backup-failed`.
 - ⬜ **`fsync` после `mv`** — на случай power-loss во время финального переименования.
 
 ### 15.6 История
