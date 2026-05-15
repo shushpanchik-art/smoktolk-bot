@@ -250,6 +250,11 @@ def test_07_unparseable_mtime(env_setup):
 
 def test_08_rclone_config_unreadable(env_setup):
     """rclone.conf не существует → FAIL до вызова rclone."""
+    # rclone-stub нужен лишь для того, чтобы `command -v rclone`
+    # прошёл (иначе скрипт упадёт раньше — на проверке наличия rclone,
+    # что зависит от системного PATH и делает тест нестабильным в CI,
+    # где rclone не установлен). До реального вызова stub дело не дойдёт.
+    _make_rclone_stub(env_setup["bin_dir"], _now_minus(1.0))
     proc = _run_script(
         env_setup, expect_rc=1,
         extra_env={"RCLONE_CONFIG": "/nonexistent/rclone.conf"},
