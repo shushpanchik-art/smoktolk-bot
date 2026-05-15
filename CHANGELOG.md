@@ -10,6 +10,39 @@
 
 _Здесь будут изменения для следующего релиза._
 
+### Added — Offsite-бэкап на Яндекс.Диск (PR #ops-offsite-yandex-disk)
+- **Вторая копия БД на Я.Диске** через WebDAV + `rclone`. Защищает от
+  потери всего VPS (хостер, диск, `rm -rf`, ransomware) — сценариев, которые
+  не покрываются локальным бэкапом из §15.7.
+- **Расписание**: `smoktolk-backup-offsite.timer` в 02:50 MSK (23:50 UTC),
+  через ~5 мин после локального бэкапа §15.7 (04:00 MSK). Healthcheck в
+  11:00 MSK (08:00 UTC) — проверяет, что `yandex:smoktolk-backup/smoktolk-latest.db.gz`
+  существует и младше `MAX_AGE_HOURS=30`. Все таймеры в `OnCalendar=` заданы
+  в UTC, чтобы не зависеть от DST/TZ хоста.
+- **Загружаются 2 файла**:
+  - `smoktolk_YYYYMMDD_HHMMSS.db.gz` — история, retention 30 дней.
+  - `smoktolk-latest.db.gz` — фиксированное имя для быстрого DR.
+- **Telegram-алерты** (зеркало §15.7): `offsite-failed` / `offsite-recovered`
+  через `notify_admin.sh`, state-файл `/var/lib/smoktolk-backup/offsite-failed`
+  для анти-дубликата.
+- **Секреты**: rclone использует **app-password** Яндекс.ID (имя `smoktolk-backup-webdav`),
+  обфусцированный `rclone obscure`. Конфиг — `/var/lib/smoktolk-rclone/rclone.conf`
+  (mode 0600, owner `smoktolk:smoktolk`). OAuth не используется.
+- Новые файлы:
+  - `scripts/backup_offsite.sh`, `scripts/backup_offsite_healthcheck.sh`
+  - `systemd/smoktolk-backup-offsite.{service,timer}`
+  - `systemd/smoktolk-backup-offsite-alert.service`
+  - `systemd/smoktolk-backup-offsite-healthcheck.{service,timer}`
+  - `tests/test_backup_offsite_sh.py` (16 кейсов: gzip, retention, idempotency,
+    rclone-фейлы, race-condition при одновременных запусках)
+  - `tests/test_backup_offsite_healthcheck_sh.py` (10 кейсов: границы возраста,
+    mtime в будущем, нечитаемый rclone-конфиг, отсутствие rclone в PATH)
+- Изменён `scripts/notify_admin.sh`: добавлены события `offsite-failed` и
+  `offsite-recovered` (общий помощник `ensure_backup_state_dir`).
+- Документация: `docs/BACKUP.md` — раздел "Offsite-бэкап на Я.Диск" с DR-процедурой
+  и инструкцией по ротации app-password. `SPEC.md` — §15.8.
+
+
 ---
 
 ## [0.3.0] — 2026-05-14

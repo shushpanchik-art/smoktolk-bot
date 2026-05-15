@@ -1,0 +1,39 @@
+[Unit]
+Description=SMOKTOLK offsite backup to Yandex.Disk (WebDAV via rclone)
+Documentation=file:/opt/smoktolk/bot/scripts/backup_offsite.sh
+Documentation=file:/opt/smoktolk/bot/docs/BACKUP.md
+After=network-online.target smoktolk-backup.service
+Wants=network-online.target
+# Если backup_offsite.sh упадёт или будет убит (kill -9 / OOM), systemd
+# запустит alert-юнит как страховку поверх trap ERR внутри скрипта.
+# notify_admin.sh сам проверит state-файл и не отправит дубликат.
+OnFailure=smoktolk-backup-offsite-alert.service
+
+[Service]
+Type=oneshot
+User=smoktolk
+Group=smoktolk
+ExecStart=/opt/smoktolk/bot/scripts/backup_offsite.sh
+
+# Логирование: дублируем в файл (как у основного backup.log) и в journal.
+StandardOutput=append:/opt/smoktolk/bot/logs/backup-offsite.log
+StandardError=append:/opt/smoktolk/bot/logs/backup-offsite.log
+
+# Общий state-каталог с основным бэкапом — там notify_admin.sh кладёт
+# offsite-failed state-файл рядом с backup-failed.
+StateDirectory=smoktolk-backup
+StateDirectoryMode=0775
+
+# Сетевая операция: gzip + 2× upload + retention. Запас по времени.
+TimeoutStartSec=30min
+
+# Безопасность.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/backups/smoktolk-offsite /opt/smoktolk/bot/logs /var/lib/smoktolk-backup
+ReadOnlyPaths=/var/backups/smoktolk /var/lib/smoktolk-rclone
+
+[Install]
+WantedBy=multi-user.target

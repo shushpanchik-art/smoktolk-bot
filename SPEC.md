@@ -294,6 +294,59 @@ find /var/backups/smoktolk -name 'smoktolk_*.db' -mtime -2 | head -1
 **Документация**: операционная инструкция в `docs/BACKUP.md` (раздел
 «Алерты в Telegram» и «Что делать при FAILED-алерте»).
 
+### 15.8 Offsite-бэкап на Я.Диск (PR #ops-offsite-yandex-disk, 2026-05-15)
+
+Локальный бэкап (§15.7) живёт на том же VPS, что и бот, и не покрывает
+сценарии потери всего хоста (хостер закрылся, диск сдох, `rm -rf` от админа,
+ransomware). Добавили вторую копию на Яндекс.Диск через WebDAV + `rclone`.
+
+**Архитектура** (детали — `docs/BACKUP.md`, раздел "Offsite-бэкап"):
+
+- 02:50 MSK / 23:50 UTC — `smoktolk-backup-offsite.timer` (ежедневно; локальный
+  бэкап §15.7 идёт в 04:00 MSK, offsite берёт его свежий результат через ~5 минут;
+  расписание в `OnCalendar=` хранится в UTC, чтобы не зависеть от DST/TZ хоста).
+- Источник — последний `smoktolk_*.db` из `/var/backups/smoktolk/`.
+- gzip-сжатие в staging `/var/backups/smoktolk-offsite/staging/`.
+- `rclone copyto` × 2:
+  - `yandex:smoktolk-backup/smoktolk_YYYYMMDD_HHMMSS.db.gz` — история (retention 30d).
+  - `yandex:smoktolk-backup/smoktolk-latest.db.gz` — фиксированное имя для DR.
+- 11:00 MSK / 08:00 UTC — `smoktolk-backup-offsite-healthcheck.timer`: запрашивает
+  `rclone lsl yandex:smoktolk-backup/smoktolk-latest.db.gz`, проверяет, что файл
+  существует и младше `MAX_AGE_HOURS=30`; иначе шлёт `offsite-failed`. Порог 30ч
+  выбран так, чтобы при одном пропущенном offsite-запуске следующий healthcheck
+  гарантированно обнаружил протухший файл (offsite→healthcheck = ~8ч,
+  следующий offsite + healthcheck = ~32ч > 30ч).
+
+**Алерты** (зеркало §25 и §15.7):
+
+- 🚨 `offsite-failed` — первый сбой (из `trap ERR`, `OnFailure=` или healthcheck).
+- ✅ `offsite-recovered` — первый успех после сбоя.
+- Анти-дубликат через state-файл `/var/lib/smoktolk-backup/offsite-failed`.
+
+**Секреты**:
+
+- rclone-конфиг: `/var/lib/smoktolk-rclone/rclone.conf`, mode 0600, owner `smoktolk:smoktolk`.
+- WebDAV-пароль — отдельный **app-password** Яндекс.ID с именем
+  `smoktolk-backup-webdav`, обфусцирован `rclone obscure`. **НЕ** основной
+  пароль аккаунта. Хранится только в rclone.conf, не в `.env`.
+- Ротация app-password: см. `docs/BACKUP.md` → "Ротация секретов".
+
+**OAuth-токен Яндекс.Диска НЕ используется**. Изначально предполагалось
+выпустить OAuth-приложение и хранить access-token, но WebDAV + app-password
+проще: не требует обновления токена и работает через стандартный rclone-бэкенд.
+
+**Файлы**:
+
+- Скрипты: `scripts/backup_offsite.sh`, `scripts/backup_offsite_healthcheck.sh`.
+- Юниты: `systemd/smoktolk-backup-offsite.service`, `*.timer`,
+  `smoktolk-backup-offsite-alert.service`,
+  `smoktolk-backup-offsite-healthcheck.service`, `*.timer`.
+- Тесты: `tests/test_backup_offsite_sh.py` (16 кейсов на основной скрипт),
+  `tests/test_backup_offsite_healthcheck_sh.py` (10 кейсов на healthcheck,
+  включая границы возраста, mtime в будущем, нечитаемый rclone-конфиг и т.п.).
+- Лог: `/opt/smoktolk/bot/logs/backup-offsite.log` (через `StandardOutput=append:`).
+
+
 ## 16. Файлы проекта
 
 ```
