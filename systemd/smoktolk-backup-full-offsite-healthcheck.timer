@@ -1,0 +1,17 @@
+[Unit]
+Description=Daily SMOKTOLK full-offsite backup freshness check at 09:00 UTC
+Documentation=file:/opt/smoktolk/bot/scripts/backup_full_offsite_healthcheck.sh
+Documentation=file:/opt/smoktolk/bot/docs/BACKUP.md
+
+[Timer]
+# 09:00 UTC ежедневно (= 12:00 MSK).
+# Через ~9ч после full-offsite-бэкапа (23:45 UTC) и через 1ч после
+# БД-offsite healthcheck (08:00 UTC), чтобы алерты по двум каналам не приходили
+# слипшимися в одну минуту.
+OnCalendar=*-*-* 09:00:00 UTC
+Persistent=true
+RandomizedDelaySec=2min
+Unit=smoktolk-backup-full-offsite-healthcheck.service
+
+[Install]
+WantedBy=timers.target

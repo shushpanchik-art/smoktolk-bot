@@ -1,0 +1,18 @@
+[Unit]
+Description=Daily SMOKTOLK full-project offsite backup at 20:00 UTC
+Documentation=file:/opt/smoktolk/bot/scripts/backup_full_offsite.sh
+Documentation=file:/opt/smoktolk/bot/docs/BACKUP.md
+
+[Timer]
+# 20:00 UTC ежедневно (= 23:00 MSK).
+# Запас 3ч 50мин до БД-offsite (23:50 UTC) — компенсирует тротлинг
+# Я.Диска WebDAV, при котором 100 МБ заливаются до 60-90 минут.
+# Гарантия "100% успеть за сутки" обеспечивается этим окном + server-side
+# copy для latest-копии (см. backup_full_offsite.sh).
+OnCalendar=*-*-* 20:00:00 UTC
+Persistent=true
+RandomizedDelaySec=2min
+Unit=smoktolk-backup-full-offsite.service
+
+[Install]
+WantedBy=timers.target
