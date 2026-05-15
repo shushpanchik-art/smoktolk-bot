@@ -185,3 +185,92 @@ rm -rf "$DRILL"
 | Дата       | Результат | Заметки |
 |------------|-----------|---------|
 | 2026-05-14 | OK        | integrity_check=ok, все 8 таблиц на месте, users=5 (совпадает с prod) |
+
+---
+
+## Offsite-бэкап на Я.Диск (PR #ops-offsite-yandex-disk, 2026-05-15)
+
+### Зачем
+
+Локальные бэкапы в `/var/backups/smoktolk/` живут на том же VPS, что и сам бот.
+Сценарии, которые они НЕ покрывают:
+
+- удалили/потеряли VPS (хостер закрылся, аккаунт заблокирован);
+- диск вышел из строя физически или повреждена файловая система;
+- ошибочный `rm -rf` от админа задел и `/var/backups`;
+- ransomware/компрометация — атакующий зашифровал в т.ч. локальные копии.
+
+Offsite-копия на Я.Диске решает все четыре кейса.
+
+### Что и куда отправляется
+
+| Объект                                  | Назначение                                          |
+|-----------------------------------------|-----------------------------------------------------|
+| `smoktolk-latest.db.gz`                 | всегда последняя копия с фиксированным именем — для быстрого DR без поиска |
+| `smoktolk_YYYYMMDD_HHMMSS.db.gz`        | история, ротация 30 дней                            |
+
+Источник — последний (по mtime) файл из `/var/backups/smoktolk/smoktolk_*.db`.
+Перед отправкой gzip-сжатие (`-9`) в staging-каталог `/var/backups/smoktolk-offsite/staging/`.
+
+### Конфигурация rclone
+
+- Бэкенд: `webdav` (https://webdav.yandex.ru/)
+- Конфиг: `/var/lib/smoktolk-rclone/rclone.conf` (mode 0600, owner `smoktolk:smoktolk`)
+- Пароль — отдельный **app-password** Яндекс.ID с именем `smoktolk-backup-webdav`,
+  обфусцирован через `rclone obscure`. **НЕ** основной пароль аккаунта.
+- Удалённая папка: `yandex:smoktolk-backup/`
+
+### Расписание (systemd timer)
+
+| Юнит                                            | Когда            | Что делает                                        |
+|-------------------------------------------------|------------------|---------------------------------------------------|
+| `smoktolk-backup-offsite.timer`                 | 02:50 MSK (23:50 UTC) | запускает `backup_offsite.sh` (через ~5 мин после локального бэкапа в 04:00 MSK) |
+| `smoktolk-backup-offsite.service`               | (oneshot)        | gzip → rclone copyto (2 копии) → retention 30d   |
+| `smoktolk-backup-offsite-alert.service`         | OnFailure        | страховка: алерт TG если service упал            |
+| `smoktolk-backup-offsite-healthcheck.timer`     | 11:00 MSK (08:00 UTC) | запускает healthcheck (через 1 час после локального healthcheck §10) |
+| `smoktolk-backup-offsite-healthcheck.service`   | (oneshot)             | `rclone lsl yandex:smoktolk-backup/smoktolk-latest.db.gz`, проверка `MAX_AGE_HOURS=30` |
+
+### Telegram-алерты
+
+Семантика зеркальная локальным:
+
+- 🚨 `offsite-failed` — первый сбой (из `trap ERR` в `backup_offsite.sh`,
+  из `OnFailure=smoktolk-backup-offsite-alert.service`, или из healthcheck).
+- ✅ `offsite-recovered` — первый успех после сбоя.
+- Анти-дубликат через state-файл `/var/lib/smoktolk-backup/offsite-failed`.
+
+### Управление
+
+    sudo systemctl status  smoktolk-backup-offsite.timer
+    systemctl list-timers  smoktolk-backup-offsite.timer
+    sudo systemctl start   smoktolk-backup-offsite.service   # вручную
+    sudo journalctl -u     smoktolk-backup-offsite.service -n 50 --no-pager
+    tail -50 /opt/smoktolk/bot/logs/backup-offsite.log
+
+### DR: восстановление из offsite
+
+    # 1. Скачать последнюю копию
+    sudo -u smoktolk rclone --config /var/lib/smoktolk-rclone/rclone.conf \
+        copy yandex:smoktolk-backup/smoktolk-latest.db.gz /tmp/
+
+    # 2. Распаковать
+    gunzip /tmp/smoktolk-latest.db.gz   # → /tmp/smoktolk-latest.db
+
+    # 3. Проверить целостность
+    sqlite3 /tmp/smoktolk-latest.db 'PRAGMA integrity_check;'
+
+    # 4. Остановить бота и заменить БД
+    sudo systemctl stop smoktolk-bot
+    sudo cp /opt/smoktolk/bot/data/smoktolk.db /opt/smoktolk/bot/data/smoktolk.db.before-dr.$(date +%s)
+    sudo cp /tmp/smoktolk-latest.db /opt/smoktolk/bot/data/smoktolk.db
+    sudo chown smoktolk:smoktolk /opt/smoktolk/bot/data/smoktolk.db
+    sudo systemctl start smoktolk-bot
+
+### Ротация секретов
+
+При компрометации app-password (или раз в год профилактически):
+
+1. https://id.yandex.ru/security/app-passwords → удалить `smoktolk-backup-webdav`
+2. Создать новый с тем же именем
+3. `rclone obscure '<новый_пароль>'` → подставить в `/var/lib/smoktolk-rclone/rclone.conf` в поле `pass=`
+4. Тест: `sudo -u smoktolk /opt/smoktolk/bot/scripts/backup_offsite.sh`

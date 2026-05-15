@@ -2,16 +2,19 @@
 # notify_admin.sh — отправка алертов админу.
 #
 # Использование:
-#   notify_admin.sh down                # 🚨 SMOKTOLK_bot DOWN
-#   notify_admin.sh backup-failed       # 🚨 SMOKTOLK backup FAILED
-#   notify_admin.sh backup-recovered    # ✅ SMOKTOLK backup восстановлен
+#   notify_admin.sh down                  # 🚨 SMOKTOLK_bot DOWN
+#   notify_admin.sh backup-failed         # 🚨 SMOKTOLK backup FAILED
+#   notify_admin.sh backup-recovered      # ✅ SMOKTOLK backup восстановлен
+#   notify_admin.sh offsite-failed        # 🚨 SMOKTOLK offsite backup FAILED
+#   notify_admin.sh offsite-recovered     # ✅ SMOKTOLK offsite backup восстановлен
 #
 # RECOVERED для бота отправляет сам Python через crash_alert.py.
-# RECOVERED для backup отправляет backup.sh через этот скрипт (backup-recovered).
+# RECOVERED для backup/offsite отправляет соответствующий .sh через этот скрипт.
 #
 # Анти-дубликат через state-файлы:
-#   /run/smoktolk-bot/crashed           — для бота (создаётся ботовым юнитом)
-#   /var/lib/smoktolk-backup/failed     — для бэкапа (persistent)
+#   /run/smoktolk-bot/crashed              — для бота (создаётся ботовым юнитом)
+#   /var/lib/smoktolk-backup/failed        — для локального бэкапа
+#   /var/lib/smoktolk-backup/offsite-failed — для offsite-бэкапа (PR #ops-offsite-yandex-disk)
 
 set -euo pipefail
 
@@ -24,6 +27,7 @@ BOT_STATE_DIR="/run/smoktolk-bot"
 BOT_STATE_FILE="${BOT_STATE_DIR}/crashed"
 BACKUP_STATE_DIR="/var/lib/smoktolk-backup"
 BACKUP_STATE_FILE="${BACKUP_STATE_DIR}/failed"
+OFFSITE_STATE_FILE="${BACKUP_STATE_DIR}/offsite-failed"
 
 log() { logger -t "$LOG_TAG" -- "$*"; echo "[$LOG_TAG] $*"; }
 
@@ -64,6 +68,16 @@ send_telegram() {
     fi
 }
 
+# Утилита: гарантирует существование BACKUP_STATE_DIR с правильными правами.
+# Используется и для backup-*, и для offsite-* событий.
+ensure_backup_state_dir() {
+    if [ ! -d "$BACKUP_STATE_DIR" ]; then
+        mkdir -p "$BACKUP_STATE_DIR"
+        chown smoktolk:smoktolk "$BACKUP_STATE_DIR" 2>/dev/null || true
+        chmod 0775 "$BACKUP_STATE_DIR"
+    fi
+}
+
 case "$EVENT" in
     down)
         # === DOWN-уведомление о крэше бота ===
@@ -85,12 +99,8 @@ case "$EVENT" in
         ;;
 
     backup-failed)
-        # === Алерт о падении бэкапа ===
-        if [ ! -d "$BACKUP_STATE_DIR" ]; then
-            mkdir -p "$BACKUP_STATE_DIR"
-            chown smoktolk:smoktolk "$BACKUP_STATE_DIR" 2>/dev/null || true
-            chmod 0775 "$BACKUP_STATE_DIR"
-        fi
+        # === Алерт о падении локального бэкапа ===
+        ensure_backup_state_dir
         if [ -e "$BACKUP_STATE_FILE" ]; then
             log "INFO: backup state-файл уже есть — backup-failed уже было отправлено, пропускаем"
             exit 0
@@ -105,8 +115,7 @@ case "$EVENT" in
         ;;
 
     backup-recovered)
-        # === Сообщение о восстановлении бэкапа ===
-        # Слётся только если был активный failed-state (т.е. предыдущий упал).
+        # === Сообщение о восстановлении локального бэкапа ===
         if [ ! -e "$BACKUP_STATE_FILE" ]; then
             log "INFO: backup state-файл отсутствует — нет необходимости в RECOVERED"
             exit 0
@@ -122,8 +131,42 @@ case "$EVENT" in
         fi
         ;;
 
+    offsite-failed)
+        # === Алерт о падении offsite-бэкапа (Я.Диск) ===
+        ensure_backup_state_dir
+        if [ -e "$OFFSITE_STATE_FILE" ]; then
+            log "INFO: offsite state-файл уже есть — offsite-failed уже было отправлено, пропускаем"
+            exit 0
+        fi
+        read_credentials
+        touch "$OFFSITE_STATE_FILE"
+        chown smoktolk:smoktolk "$OFFSITE_STATE_FILE" 2>/dev/null || true
+        TEXT="🚨 *SMOKTOLK offsite backup FAILED*
+Отправка бэкапа на Я.Диск упала.
+Лог: \`/opt/smoktolk/bot/logs/backup_offsite.log\`
+Проверь: \`systemctl status smoktolk-backup-offsite\`"
+        send_telegram "$TEXT" || exit $?
+        ;;
+
+    offsite-recovered)
+        # === Сообщение о восстановлении offsite-бэкапа ===
+        if [ ! -e "$OFFSITE_STATE_FILE" ]; then
+            log "INFO: offsite state-файл отсутствует — нет необходимости в RECOVERED"
+            exit 0
+        fi
+        read_credentials
+        TEXT="✅ *SMOKTOLK offsite backup восстановлен*
+Очередная отправка на Я.Диск прошла успешно."
+        if send_telegram "$TEXT"; then
+            rm -f "$OFFSITE_STATE_FILE"
+            log "OK: offsite state-файл удалён"
+        else
+            exit $?
+        fi
+        ;;
+
     *)
-        log "ERROR: неизвестное событие: '$EVENT'. Допустимо: down, backup-failed, backup-recovered"
+        log "ERROR: неизвестное событие: '$EVENT'. Допустимо: down, backup-failed, backup-recovered, offsite-failed, offsite-recovered"
         exit 2
         ;;
 esac

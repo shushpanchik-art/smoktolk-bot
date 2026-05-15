@@ -1,0 +1,18 @@
+[Unit]
+Description=Daily SMOKTOLK offsite backup at 23:50 UTC
+Documentation=file:/opt/smoktolk/bot/scripts/backup_offsite.sh
+Documentation=file:/opt/smoktolk/bot/docs/BACKUP.md
+
+[Timer]
+# 23:50 UTC ежедневно. UTC задаётся явно, чтобы не зависеть от системного TZ.
+# Локальный backup.sh идёт в 01:00 UTC того же дня; offsite в 23:50 UTC
+# заливает уже сделанный днём ранее файл, давая ~23ч запаса на завершение.
+OnCalendar=*-*-* 23:50:00 UTC
+# Если сервер был выключен — догоним при следующем запуске.
+Persistent=true
+# Случайный jitter ±2 мин — не совпадать с другими ночными задачами.
+RandomizedDelaySec=2min
+Unit=smoktolk-backup-offsite.service
+
+[Install]
+WantedBy=timers.target

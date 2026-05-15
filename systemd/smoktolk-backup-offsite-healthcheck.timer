@@ -1,0 +1,16 @@
+[Unit]
+Description=Daily SMOKTOLK offsite backup freshness check at 08:00 UTC
+Documentation=file:/opt/smoktolk/bot/scripts/backup_offsite_healthcheck.sh
+Documentation=file:/opt/smoktolk/bot/docs/BACKUP.md
+
+[Timer]
+# 08:00 UTC ежедневно (= 11:00 MSK).
+# Через ~8ч после offsite-бэкапа (23:50 UTC) и через ~1ч после
+# локального backup-healthcheck (07:00 UTC = 10:00 MSK).
+OnCalendar=*-*-* 08:00:00 UTC
+Persistent=true
+RandomizedDelaySec=2min
+Unit=smoktolk-backup-offsite-healthcheck.service
+
+[Install]
+WantedBy=timers.target
