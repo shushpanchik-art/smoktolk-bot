@@ -7,6 +7,8 @@
 #   notify_admin.sh backup-recovered      # ✅ SMOKTOLK backup восстановлен
 #   notify_admin.sh offsite-failed        # 🚨 SMOKTOLK offsite backup FAILED
 #   notify_admin.sh offsite-recovered     # ✅ SMOKTOLK offsite backup восстановлен
+#   notify_admin.sh offsite-full-failed   # 🚨 SMOKTOLK full-offsite backup FAILED
+#   notify_admin.sh offsite-full-recovered # ✅ SMOKTOLK full-offsite backup восстановлен
 #
 # RECOVERED для бота отправляет сам Python через crash_alert.py.
 # RECOVERED для backup/offsite отправляет соответствующий .sh через этот скрипт.
@@ -14,7 +16,8 @@
 # Анти-дубликат через state-файлы:
 #   /run/smoktolk-bot/crashed              — для бота (создаётся ботовым юнитом)
 #   /var/lib/smoktolk-backup/failed        — для локального бэкапа
-#   /var/lib/smoktolk-backup/offsite-failed — для offsite-бэкапа (PR #ops-offsite-yandex-disk)
+#   /var/lib/smoktolk-backup/offsite-failed — для offsite-бэкапа БД (PR #ops-offsite-yandex-disk)
+#   /var/lib/smoktolk-backup/offsite-full-failed — для full-tar offsite (PR #ops-offsite-full-tar)
 
 set -euo pipefail
 
@@ -28,6 +31,7 @@ BOT_STATE_FILE="${BOT_STATE_DIR}/crashed"
 BACKUP_STATE_DIR="/var/lib/smoktolk-backup"
 BACKUP_STATE_FILE="${BACKUP_STATE_DIR}/failed"
 OFFSITE_STATE_FILE="${BACKUP_STATE_DIR}/offsite-failed"
+OFFSITE_FULL_STATE_FILE="${BACKUP_STATE_DIR}/offsite-full-failed"
 
 log() { logger -t "$LOG_TAG" -- "$*"; echo "[$LOG_TAG] $*"; }
 
@@ -165,8 +169,42 @@ case "$EVENT" in
         fi
         ;;
 
+    offsite-full-failed)
+        # === Алерт о падении full-tar offsite-бэкапа (Я.Диск) ===
+        ensure_backup_state_dir
+        if [ -e "$OFFSITE_FULL_STATE_FILE" ]; then
+            log "INFO: offsite-full state-файл уже есть — offsite-full-failed уже было отправлено, пропускаем"
+            exit 0
+        fi
+        read_credentials
+        touch "$OFFSITE_FULL_STATE_FILE"
+        chown smoktolk:smoktolk "$OFFSITE_FULL_STATE_FILE" 2>/dev/null || true
+        TEXT="🚨 *SMOKTOLK full-offsite backup FAILED*
+Полный архив /opt/smoktolk/ не загружен на Я.Диск.
+Лог: \`/opt/smoktolk/bot/logs/backup-full-offsite.log\`
+Проверь: \`systemctl status smoktolk-backup-full-offsite\`"
+        send_telegram "$TEXT" || exit $?
+        ;;
+
+    offsite-full-recovered)
+        # === Сообщение о восстановлении full-tar offsite-бэкапа ===
+        if [ ! -e "$OFFSITE_FULL_STATE_FILE" ]; then
+            log "INFO: offsite-full state-файл отсутствует — нет необходимости в RECOVERED"
+            exit 0
+        fi
+        read_credentials
+        TEXT="✅ *SMOKTOLK full-offsite backup восстановлен*
+Очередная отправка полного архива на Я.Диск прошла успешно."
+        if send_telegram "$TEXT"; then
+            rm -f "$OFFSITE_FULL_STATE_FILE"
+            log "OK: offsite-full state-файл удалён"
+        else
+            exit $?
+        fi
+        ;;
+
     *)
-        log "ERROR: неизвестное событие: '$EVENT'. Допустимо: down, backup-failed, backup-recovered, offsite-failed, offsite-recovered"
+        log "ERROR: неизвестное событие: '$EVENT'. Допустимо: down, backup-failed, backup-recovered, offsite-failed, offsite-recovered, offsite-full-failed, offsite-full-recovered"
         exit 2
         ;;
 esac

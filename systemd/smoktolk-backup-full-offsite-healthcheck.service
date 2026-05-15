@@ -1,0 +1,22 @@
+[Unit]
+Description=SMOKTOLK full-offsite backup freshness healthcheck (Yandex.Disk)
+Documentation=file:/opt/smoktolk/bot/scripts/backup_full_offsite_healthcheck.sh
+Documentation=file:/opt/smoktolk/bot/docs/BACKUP.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=smoktolk
+Group=smoktolk
+ExecStart=/opt/smoktolk/bot/scripts/backup_full_offsite_healthcheck.sh
+# Скрипт сам зовёт notify_admin.sh при FAIL — OnFailure здесь не нужен.
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=3min
+
+StateDirectory=smoktolk-backup
+StateDirectoryMode=0775
+
+NoNewPrivileges=yes
+PrivateTmp=yes

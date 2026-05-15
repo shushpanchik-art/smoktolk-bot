@@ -1,0 +1,20 @@
+[Unit]
+Description=Send Telegram alert when SMOKTOLK full-offsite backup fails
+Documentation=file:/opt/smoktolk/bot/docs/BACKUP.md
+# Вызывается через OnFailure= из smoktolk-backup-full-offsite.service.
+# Собственного OnFailure= нет, чтобы не зациклить алерты.
+
+[Service]
+Type=oneshot
+User=smoktolk
+Group=smoktolk
+ExecStart=/opt/smoktolk/bot/scripts/notify_admin.sh offsite-full-failed
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=30s
+
+StateDirectory=smoktolk-backup
+StateDirectoryMode=0775
+
+NoNewPrivileges=yes
+PrivateTmp=yes
