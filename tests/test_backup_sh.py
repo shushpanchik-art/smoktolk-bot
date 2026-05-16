@@ -189,3 +189,62 @@ def test_log_format_has_timestamp(env):
         assert line.startswith("["), f"bad line: {line!r}"
         # после ']' идёт пробел и текст
         assert "] " in line, f"bad line: {line!r}"
+
+
+
+
+# ---------- fsync durability tests ----------
+
+
+
+
+def test_fsync_logged_after_successful_backup(env):
+    """После создания бэкапа лог содержит 'fsynced' — подтверждение, что
+    code path с sync(1) выполнился. Реальную durability проверить в юнит-
+    тесте невозможно (нет power loss), но отсутствие маркера = регрессия:
+    кто-то удалил sync, что снова делает бэкап уязвимым к power loss.
+    """
+    cfg = {k: v for k, v in env.items() if not k.startswith("_")}
+    r = _run(cfg)
+    assert "fsynced" in r.stdout, (
+        "Маркер 'fsynced' отсутствует в логе — возможно, sync(1) удалён.\n"
+        f"STDOUT:\n{r.stdout}"
+    )
+
+
+
+
+def test_fsync_not_logged_on_skip(env):
+    """При skipped (нет изменений) бэкап не создаётся → sync не нужен → маркера 'fsynced' нет."""
+    cfg = {k: v for k, v in env.items() if not k.startswith("_")}
+    _run(cfg)
+    time.sleep(1.1)
+    r = _run(cfg)
+    # При skip log "backup ok ... fsynced" не должен появиться
+    assert "skipped" in r.stdout
+    # Ищем именно "fsynced" в строке backup ok — если маркер где-то ещё
+    # (например, в комментариях скрипта) — это другой контекст.
+    ok_lines = [line for line in r.stdout.splitlines() if "backup ok" in line]
+    assert ok_lines == [], f"unexpected 'backup ok' lines on skip: {ok_lines}"
+
+
+
+
+def test_backup_file_durable_and_valid_after_sync(env):
+    """После sync файл .db реально лежит на диске и является валидным SQLite.
+    Это smoke-тест на то, что sync(1) не повредил данные (sync — read-only
+    операция относительно содержимого, но проверяем явно).
+    """
+    cfg = {k: v for k, v in env.items() if not k.startswith("_")}
+    _run(cfg)
+    backups = _backups(env["_backup_dir"])
+    assert len(backups) == 1
+    # Файл существует, не пустой, открывается как SQLite, содержит наши данные
+    backup_path = backups[0]
+    assert backup_path.stat().st_size > 0, "backup is empty"
+    con = sqlite3.connect(str(backup_path))
+    try:
+        rows = con.execute("SELECT v FROM t").fetchall()
+    finally:
+        con.close()
+    assert rows == [("v1",)], f"backup data mismatch: {rows}"
