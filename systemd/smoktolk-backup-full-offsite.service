@@ -4,10 +4,10 @@ Documentation=file:/opt/smoktolk/bot/scripts/backup_full_offsite.sh
 Documentation=file:/opt/smoktolk/bot/docs/BACKUP.md
 After=network-online.target
 Wants=network-online.target
-# Идёт в 20:00 UTC (= 23:00 MSK), на 3ч 50мин раньше БД-offsite (23:50 UTC).
-# Большой запас выбран из-за тротлинга Я.Диска WebDAV: 100 МБ заливаются
-# в худшем случае 60-90 минут. См. комментарии в backup_full_offsite.sh.
-# Не зависит от smoktolk-backup-offsite.service (тот стартует значительно позже).
+# Расписание: 23:30 UTC (= 02:30 MSK) — см. .timer-юнит.
+# Заливка через native Yandex.Disk API ~50 сек для 100 МБ (после миграции с WebDAV
+# в PR #49). Раньше из-за WebDAV-тротлинга закладывали 60-90 мин — теперь не актуально.
+# Не зависит от smoktolk-backup-offsite.service (тот стартует в 02:50 MSK позже).
 # В отличие от backup_offsite.sh, который копирует уже готовый локальный
 # дамп БД, full-tar самодостаточен — нужен только живой /opt/smoktolk/.
 OnFailure=smoktolk-backup-full-offsite-alert.service
@@ -26,11 +26,10 @@ StandardError=append:/opt/smoktolk/bot/logs/backup-full-offsite.log
 StateDirectory=smoktolk-backup
 StateDirectoryMode=0775
 
-# Я.Диск WebDAV тротлит upload: 100 МБ может заливаться до 60-90 мин
-# из-за резкой деградации скорости после ~40 МБ. Server-side copy
-# history→latest добавляет 0.5-1 мин. TimeoutStartSec=180min = запас 2×.
-# Если действительно упрёмся в 3 часа — это уже не таймаут, а инцидент.
-TimeoutStartSec=180min
+# Native Yandex.Disk API: ~50 сек на 100 МБ + ~1 сек server-side copy history→latest.
+# 30 мин выбраны как защита от транзиентных network-проблем + retry-margin.
+# В нормальном режиме упираемся в <2 мин; если 30 мин — это инцидент, не таймаут.
+TimeoutStartSec=30min
 
 # Безопасность.
 NoNewPrivileges=yes
