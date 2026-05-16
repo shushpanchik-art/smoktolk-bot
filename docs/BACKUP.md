@@ -149,7 +149,7 @@ State-каталог `/var/lib/smoktolk-backup/` создаётся systemd че
 | `smoktolk-backup-healthcheck.service`      | (oneshot)     | запускает `scripts/backup_healthcheck.sh` |
 
 Скрипт `scripts/backup_healthcheck.sh`:
-- ищет `smoktolk_*.db` младше `MAX_AGE_HOURS=36` через `find -mmin`;
+- ищет `smoktolk_*.db` младше `MAX_AGE_HOURS=192` (= `SAFETY_NET_DAYS=7×24 + 24ч` запаса) через `find -mmin`. Большой порог нужен, потому что `backup.sh` валидно пропускает создание файла до 7 дней подряд, если БД не менялась (safety-net в `backup.sh:116`). Меньший порог давал бы ложные алерты при отсутствии активности у пользователей бота;
 - если такого нет — зовёт `scripts/notify_admin.sh backup-failed` и завершается с кодом 1;
 - если есть — пишет OK в journal и выходит с 0.
 
