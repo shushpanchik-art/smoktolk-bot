@@ -129,8 +129,16 @@ else
     FINAL_PATH="$BACKUP_DIR/${BACKUP_PREFIX}${DATE}.db"
     mv "$TMP_SNAPSHOT" "$FINAL_PATH"
     echo "$NEW_HASH" > "$HASH_FILE"
+    # Durability: force data + metadata to disk before reporting success.
+    # Without this, the file lives in page cache for up to ~30s; a power
+    # loss in that window leaves a 0-byte or partially-written .db while
+    # this script already returned exit 0 (false-positive success).
+    # We sync: (1) the backup file, (2) the hash file, (3) the directory
+    # so the rename/create entries themselves are durable.
+    sync "$FINAL_PATH" "$HASH_FILE" "$BACKUP_DIR" \
+        || log "WARN: sync failed (rc=$?), backup may not be durable"
     SIZE="$(stat -c %s "$FINAL_PATH")"
-    log "backup ok: ${BACKUP_PREFIX}${DATE}.db (${SIZE} bytes, sha256=${NEW_HASH:0:12})"
+    log "backup ok: ${BACKUP_PREFIX}${DATE}.db (${SIZE} bytes, sha256=${NEW_HASH:0:12}, fsynced)"
 fi
 
 # --- Shag 5a: retenshn po vozrastu ---
@@ -159,6 +167,12 @@ if [ "$CURRENT_SIZE" -gt "$MAX_TOTAL_BYTES" ]; then
         CURRENT_SIZE="$(total_size "$BACKUP_DIR" "$BACKUP_GLOB")"
     done
     log "retention: udaleno po limitu razmera (>${MAX_TOTAL_BYTES} B): $DELETED_SIZE sht., itogo: ${CURRENT_SIZE} B"
+fi
+
+# Durability of retention: rm() updates directory metadata in page cache;
+# fsync the directory so deletions survive power loss too.
+if [ "$DELETED_AGE" -gt 0 ] || [ "$DELETED_SIZE" -gt 0 ]; then
+    sync "$BACKUP_DIR" || log "WARN: sync after retention failed (rc=$?)"
 fi
 
 # --- Itogovaya statistika ---
