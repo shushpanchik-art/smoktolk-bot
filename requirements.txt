@@ -1,8 +1,15 @@
-aiogram==3.28.2
-aiohttp==3.13.5
-aiosqlite==0.22.1
-openpyxl==3.1.5
-qrcode==8.2
-Pillow==12.2.0
-python-dotenv==1.2.2
-pytz==2026.2
+# Production dependencies for smoktolk-bot.
+# Install: pip install -r requirements.txt
+# Audit:   pip-audit
+#
+# Pin policy: exact versions for reproducibility.
+# Dependabot bumps via auto-PRs (see .github/dependabot.yml).
+
+aiogram==3.28.2          # Telegram Bot framework
+aiohttp==3.13.5          # async HTTP client (transitively used by aiogram)
+aiosqlite==0.22.1        # async SQLite driver
+openpyxl==3.1.5          # Excel export (admin reports)
+qrcode==8.2              # QR generation for gifts and REDEEM tokens
+Pillow==12.2.0           # required by qrcode for PNG rendering (utils.py:make_qr)
+python-dotenv==1.2.2     # .env config loader
+pytz==2026.2             # timezone-aware datetimes (MSK)
