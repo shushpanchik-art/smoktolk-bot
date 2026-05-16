@@ -121,7 +121,7 @@ def _run_script(env_setup: dict, expect_rc: int | None = None, extra_env: dict |
     env = os.environ.copy()
     env["PATH"] = f"{env_setup['bin_dir']}:{env.get('PATH', '')}"
     env["RCLONE_CONFIG"] = str(env_setup["rclone_config"])
-    env["RCLONE_REMOTE"] = "yandex:smoktolk-backup"
+    env["RCLONE_REMOTE"] = "yandex_native:smoktolk-backup"
     env["LATEST_NAME"] = "smoktolk-latest.db.gz"
     env["NOTIFY_SCRIPT"] = str(env_setup["bin_dir"] / "notify_admin.sh")
     env["MAX_AGE_HOURS"] = "30"
@@ -152,7 +152,7 @@ def env_setup(tmp_path):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     rclone_config = tmp_path / "rclone.conf"
-    rclone_config.write_text("[yandex]\ntype = webdav\n", encoding="utf-8")
+    rclone_config.write_text("[yandex_native]\ntype = yandex\n", encoding="utf-8")
 
     notify_log = _make_notify_stub(bin_dir)
 
@@ -295,7 +295,7 @@ def test_09_rclone_not_in_path(env_setup, tmp_path):
     env = {
         "PATH": str(sandbox),  # ТОЛЬКО sandbox — rclone сюда не положили
         "RCLONE_CONFIG": str(env_setup["rclone_config"]),
-        "RCLONE_REMOTE": "yandex:smoktolk-backup",
+        "RCLONE_REMOTE": "yandex_native:smoktolk-backup",
         "LATEST_NAME": "smoktolk-latest.db.gz",
         "NOTIFY_SCRIPT": str(sandbox / "notify_admin.sh"),
         "MAX_AGE_HOURS": "30",

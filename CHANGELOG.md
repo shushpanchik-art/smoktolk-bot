@@ -10,13 +10,13 @@
 
 _Здесь будут изменения для следующего релиза._
 
-### Added — Offsite-бэкап на Яндекс.Диск (PR #ops-offsite-yandex-disk)
-- **Вторая копия БД на Я.Диске** через WebDAV + `rclone`. Защищает от
+### Added — L2: Offsite-бэкап БД на Яндекс.Диск (PR #ops-offsite-yandex-disk)
+- **Вторая копия БД на Я.Диске** через `rclone`. Защищает от
   потери всего VPS (хостер, диск, `rm -rf`, ransomware) — сценариев, которые
   не покрываются локальным бэкапом из §15.7.
 - **Расписание**: `smoktolk-backup-offsite.timer` в 02:50 MSK (23:50 UTC),
   через ~5 мин после локального бэкапа §15.7 (04:00 MSK). Healthcheck в
-  11:00 MSK (08:00 UTC) — проверяет, что `yandex:smoktolk-backup/smoktolk-latest.db.gz`
+  11:00 MSK (08:00 UTC) — проверяет, что `yandex_native:smoktolk-backup/smoktolk-latest.db.gz`
   существует и младше `MAX_AGE_HOURS=30`. Все таймеры в `OnCalendar=` заданы
   в UTC, чтобы не зависеть от DST/TZ хоста.
 - **Загружаются 2 файла**:
@@ -25,9 +25,6 @@ _Здесь будут изменения для следующего релиз
 - **Telegram-алерты** (зеркало §15.7): `offsite-failed` / `offsite-recovered`
   через `notify_admin.sh`, state-файл `/var/lib/smoktolk-backup/offsite-failed`
   для анти-дубликата.
-- **Секреты**: rclone использует **app-password** Яндекс.ID (имя `smoktolk-backup-webdav`),
-  обфусцированный `rclone obscure`. Конфиг — `/var/lib/smoktolk-rclone/rclone.conf`
-  (mode 0600, owner `smoktolk:smoktolk`). OAuth не используется.
 - Новые файлы:
   - `scripts/backup_offsite.sh`, `scripts/backup_offsite_healthcheck.sh`
   - `systemd/smoktolk-backup-offsite.{service,timer}`
@@ -39,9 +36,49 @@ _Здесь будут изменения для следующего релиз
     mtime в будущем, нечитаемый rclone-конфиг, отсутствие rclone в PATH)
 - Изменён `scripts/notify_admin.sh`: добавлены события `offsite-failed` и
   `offsite-recovered` (общий помощник `ensure_backup_state_dir`).
-- Документация: `docs/BACKUP.md` — раздел "Offsite-бэкап на Я.Диск" с DR-процедурой
-  и инструкцией по ротации app-password. `SPEC.md` — §15.8.
 
+### Added — L3: Полный offsite-архив проекта (PR #ops-offsite-full-tar)
+- **Третий уровень бэкапа**: полный архив `/opt/smoktolk/` (~100 МБ) на
+  Я.Диск. Защищает не только БД (как L2), но и код, конфиги, ассеты —
+  на случай, если git-репозиторий пропадёт вместе с VPS или последний коммит
+  не успели запушить.
+- **Расписание**: `smoktolk-backup-full-offsite.timer` в 02:30 MSK (23:30 UTC),
+  до L2 (23:50 UTC) чтобы не пересекаться по сети. Healthcheck в 09:00 MSK
+  (06:00 UTC), `MAX_AGE_HOURS=30`.
+- **Архивация**: `tar.gz` уровня 6 (баланс CPU/размер), исключения
+  `venv/`, `__pycache__/`, `.pytest_cache/`, `*.pyc`, `.git/objects/pack/`,
+  `*.log`. Загружаются 2 файла: `smoktolk-full_YYYYMMDD_HHMMSS.tar.gz`
+  (история, retention 30 дней) и `smoktolk-full-latest.tar.gz` (DR-копия
+  через server-side `rclone copyto` — экономит 50% трафика).
+- **Telegram-алерты**: `full-offsite-failed` / `full-offsite-recovered`,
+  state-файл `/var/lib/smoktolk-backup/full-offsite-failed`.
+- Новые файлы:
+  - `scripts/backup_full_offsite.sh`, `scripts/backup_full_offsite_healthcheck.sh`
+  - `systemd/smoktolk-backup-full-offsite.{service,timer}`
+  - `systemd/smoktolk-backup-full-offsite-alert.service`
+  - `systemd/smoktolk-backup-full-offsite-healthcheck.{service,timer}`
+
+### Changed — Переход с WebDAV на native Yandex.Disk API (PR #ops-offsite-native-api)
+- L2 (БД) и L3 (полный архив) переведены с rclone backend `webdav`
+  (https://webdav.yandex.ru/) на native backend `yandex` (через OAuth-токен).
+  **Причина**: WebDAV-эндпоинт Я.Диска троттлится на ~70 КБ/с независимо от
+  `--bwlimit`/`--transfers`/времени суток. Для L2 (3-4 КБ) это незаметно,
+  но для L3 (100 МБ) заливка занимала ~25 минут и натыкалась на
+  `TimeoutStartSec=`. После перехода на native API — заливка 100 МБ за
+  ~50 секунд (улучшение в ~30 раз).
+- Основной remote в `/var/lib/smoktolk-rclone/rclone.conf` теперь
+  `yandex_native:` (backend `yandex`, OAuth-токен через `rclone config`
+  browser-flow). Legacy WebDAV-remote `yandex:` оставлен как backup-вариант.
+- Все скрипты (`backup_offsite.sh`, `backup_full_offsite.sh`,
+  `backup_offsite_healthcheck.sh`, `backup_full_offsite_healthcheck.sh`)
+  и тесты обновлены под `yandex_native:`.
+
+### Docs
+- `docs/BACKUP.md` — раздел "Offsite-бэкап на Я.Диск" (L2) обновлён под
+  native API; добавлен раздел "L3 Offsite-бэкап: полный архив проекта"
+  с DR-процедурой.
+- `SPEC.md` §15.8 переписан под native API; добавлен §15.9 про L3 +
+  историю перехода с WebDAV; таблица уровней бэкапа L1/L2/L3.
 
 ---
 
