@@ -28,7 +28,7 @@
 set -euo pipefail
 
 RCLONE_CONFIG="${RCLONE_CONFIG:-/var/lib/smoktolk-rclone/rclone.conf}"
-RCLONE_REMOTE="${RCLONE_REMOTE:-yandex:smoktolk-backup}"
+RCLONE_REMOTE="${RCLONE_REMOTE:-yandex_native:smoktolk-backup}"
 LATEST_NAME="${LATEST_NAME:-smoktolk-latest.db.gz}"
 MAX_AGE_HOURS="${MAX_AGE_HOURS:-30}"
 NOTIFY_SCRIPT="${NOTIFY_SCRIPT:-/opt/smoktolk/bot/scripts/notify_admin.sh}"

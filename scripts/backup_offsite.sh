@@ -19,7 +19,7 @@
 #   BACKUP_DIR        каталог локальных бэкапов (default: /var/backups/smoktolk)
 #   STAGING_DIR       где готовим .gz перед заливкой (default: /var/backups/smoktolk-offsite/staging)
 #   RCLONE_CONFIG     путь к rclone.conf (default: /var/lib/smoktolk-rclone/rclone.conf)
-#   RCLONE_REMOTE     имя remote:path (default: yandex:smoktolk-backup)
+#   RCLONE_REMOTE     имя remote:path (default: yandex_native:smoktolk-backup)
 #   OFFSITE_RETENTION_DAYS  ротация на стороне Я.Диска (default: 30)
 #   NOTIFY_SCRIPT     путь к notify_admin.sh
 # ============================================================================
@@ -31,7 +31,7 @@ BOT_DIR="${BOT_DIR:-/opt/smoktolk/bot}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/smoktolk}"
 STAGING_DIR="${STAGING_DIR:-/var/backups/smoktolk-offsite/staging}"
 RCLONE_CONFIG="${RCLONE_CONFIG:-/var/lib/smoktolk-rclone/rclone.conf}"
-RCLONE_REMOTE="${RCLONE_REMOTE:-yandex:smoktolk-backup}"
+RCLONE_REMOTE="${RCLONE_REMOTE:-yandex_native:smoktolk-backup}"
 OFFSITE_RETENTION_DAYS="${OFFSITE_RETENTION_DAYS:-30}"
 NOTIFY_SCRIPT="${NOTIFY_SCRIPT:-$BOT_DIR/scripts/notify_admin.sh}"
 

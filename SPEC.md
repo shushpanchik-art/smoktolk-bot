@@ -294,13 +294,13 @@ find /var/backups/smoktolk -name 'smoktolk_*.db' -mtime -2 | head -1
 **Документация**: операционная инструкция в `docs/BACKUP.md` (раздел
 «Алерты в Telegram» и «Что делать при FAILED-алерте»).
 
-### 15.8 Offsite-бэкап на Я.Диск (PR #ops-offsite-yandex-disk, 2026-05-15)
+### 15.8 Offsite-бэкап БД на Я.Диск (PR #ops-offsite-yandex-disk + #ops-offsite-native-api, 2026-05-15)
 
 Локальный бэкап (§15.7) живёт на том же VPS, что и бот, и не покрывает
 сценарии потери всего хоста (хостер закрылся, диск сдох, `rm -rf` от админа,
-ransomware). Добавили вторую копию на Яндекс.Диск через WebDAV + `rclone`.
+ransomware). Добавили вторую копию БД на Яндекс.Диск через `rclone`.
 
-**Архитектура** (детали — `docs/BACKUP.md`, раздел "Offsite-бэкап"):
+**Архитектура** (детали — `docs/BACKUP.md`, раздел "Offsite-бэкап на Я.Диск"):
 
 - 02:50 MSK / 23:50 UTC — `smoktolk-backup-offsite.timer` (ежедневно; локальный
   бэкап §15.7 идёт в 04:00 MSK, offsite берёт его свежий результат через ~5 минут;
@@ -308,10 +308,10 @@ ransomware). Добавили вторую копию на Яндекс.Диск
 - Источник — последний `smoktolk_*.db` из `/var/backups/smoktolk/`.
 - gzip-сжатие в staging `/var/backups/smoktolk-offsite/staging/`.
 - `rclone copyto` × 2:
-  - `yandex:smoktolk-backup/smoktolk_YYYYMMDD_HHMMSS.db.gz` — история (retention 30d).
-  - `yandex:smoktolk-backup/smoktolk-latest.db.gz` — фиксированное имя для DR.
+  - `yandex_native:smoktolk-backup/smoktolk_YYYYMMDD_HHMMSS.db.gz` — история (retention 30d).
+  - `yandex_native:smoktolk-backup/smoktolk-latest.db.gz` — фиксированное имя для DR.
 - 11:00 MSK / 08:00 UTC — `smoktolk-backup-offsite-healthcheck.timer`: запрашивает
-  `rclone lsl yandex:smoktolk-backup/smoktolk-latest.db.gz`, проверяет, что файл
+  `rclone lsl yandex_native:smoktolk-backup/smoktolk-latest.db.gz`, проверяет, что файл
   существует и младше `MAX_AGE_HOURS=30`; иначе шлёт `offsite-failed`. Порог 30ч
   выбран так, чтобы при одном пропущенном offsite-запуске следующий healthcheck
   гарантированно обнаружил протухший файл (offsite→healthcheck = ~8ч,
@@ -323,17 +323,16 @@ ransomware). Добавили вторую копию на Яндекс.Диск
 - ✅ `offsite-recovered` — первый успех после сбоя.
 - Анти-дубликат через state-файл `/var/lib/smoktolk-backup/offsite-failed`.
 
-**Секреты**:
+**Секреты и backend** (см. также §15.9 о переходе с WebDAV на native API):
 
 - rclone-конфиг: `/var/lib/smoktolk-rclone/rclone.conf`, mode 0600, owner `smoktolk:smoktolk`.
-- WebDAV-пароль — отдельный **app-password** Яндекс.ID с именем
-  `smoktolk-backup-webdav`, обфусцирован `rclone obscure`. **НЕ** основной
-  пароль аккаунта. Хранится только в rclone.conf, не в `.env`.
-- Ротация app-password: см. `docs/BACKUP.md` → "Ротация секретов".
-
-**OAuth-токен Яндекс.Диска НЕ используется**. Изначально предполагалось
-выпустить OAuth-приложение и хранить access-token, но WebDAV + app-password
-проще: не требует обновления токена и работает через стандартный rclone-бэкенд.
+- Основной remote `yandex_native:` — backend `yandex` (native Yandex.Disk API
+  через OAuth-токен). OAuth получен через `rclone config` (browser-flow), хранится
+  только в rclone.conf, не в `.env`.
+- Legacy remote `yandex:` (backend `webdav`) с **app-password** Яндекс.ID
+  `smoktolk-backup-webdav` оставлен в конфиге для обратной совместимости — после
+  миграции на native не используется, но при необходимости можно переключиться обратно.
+- Ротация секретов: см. `docs/BACKUP.md` → "Ротация секретов".
 
 **Файлы**:
 
@@ -346,6 +345,67 @@ ransomware). Добавили вторую копию на Яндекс.Диск
   включая границы возраста, mtime в будущем, нечитаемый rclone-конфиг и т.п.).
 - Лог: `/opt/smoktolk/bot/logs/backup-offsite.log` (через `StandardOutput=append:`).
 
+### 15.9 Полный offsite-архив проекта + переход на native API (PR #ops-offsite-full-tar + #ops-offsite-native-api, 2026-05-15)
+
+§15.8 защищает только БД (3-4 КБ). Этого достаточно, если код проекта живёт
+в git, но если git-репозиторий пропадёт вместе с VPS (или последний коммит
+не успели запушить) — придётся восстанавливать конфиги, ассеты и
+прикладную инфраструктуру по памяти. §15.9 закрывает этот сценарий: вторая
+offsite-копия — **полный архив `/opt/smoktolk/`** (~100 МБ).
+
+**Что и куда**:
+
+- Источник: `/opt/smoktolk/` целиком, кроме `venv/`, `__pycache__/`,
+  `.pytest_cache/`, `*.pyc`, `.git/objects/pack/`, `*.log` и временных файлов.
+- Архив: `tar.gz` (уровень 6, эмпирически — лучший баланс CPU/размер,
+  тестировали 1/6/9: уровень 9 даёт +3% выгоды по размеру за 4× CPU).
+- Цели на Я.Диске (папка `yandex_native:smoktolk-backup-full/`):
+  - `smoktolk-full_YYYYMMDD_HHMMSS.tar.gz` — история (retention 30 дней).
+  - `smoktolk-full-latest.tar.gz` — фиксированное имя для DR (server-side copy
+    из history через `rclone copyto`, не повторная заливка — экономит 50%
+    трафика и времени).
+
+**Расписание**:
+
+- 02:30 MSK / 23:30 UTC — `smoktolk-backup-full-offsite.timer` (ежедневно).
+  Время выбрано до §15.8 (23:50 UTC), чтобы две offsite-задачи не пересекались
+  по сети и CPU. Запас 17 минут при типичном времени заливки ~50 секунд через
+  native API.
+- 09:00 MSK / 06:00 UTC — `smoktolk-backup-full-offsite-healthcheck.timer`:
+  `MAX_AGE_HOURS=30`, та же логика, что в §15.8.
+
+**Переход с WebDAV на native Yandex.Disk API**:
+
+Изначально §15.8 и §15.9 использовали WebDAV-эндпоинт Я.Диска
+(`https://webdav.yandex.ru/`, backend `webdav` + app-password). Для §15.8 (3-4 КБ)
+это работало отлично, но при первой же заливке полного архива (~100 МБ)
+для §15.9 обнаружили: **WebDAV-эндпоинт троттлится на ~70 КБ/с** независимо
+от `--bwlimit`, `--transfers`, времени суток. Заливка 100 МБ занимала ~25 минут
+и периодически натыкалась на `TimeoutStartSec=`.
+
+Переход на native backend `yandex` (тип в rclone — `yandex`, авторизация — OAuth
+через browser-flow) даёт стабильные 2-3 МБ/с — заливка тех же 100 МБ занимает
+~50 секунд (улучшение в ~30 раз). Оба раздела (§15.8 и §15.9) теперь используют
+remote `yandex_native:` как основной; legacy WebDAV-remote `yandex:` остался
+в конфиге как backup-вариант.
+
+**Файлы**:
+
+- Скрипты: `scripts/backup_full_offsite.sh`, `scripts/backup_full_offsite_healthcheck.sh`.
+- Юниты: `systemd/smoktolk-backup-full-offsite.service`, `*.timer`,
+  `smoktolk-backup-full-offsite-alert.service`,
+  `smoktolk-backup-full-offsite-healthcheck.service`, `*.timer`.
+- Алерты: `full-offsite-failed` / `full-offsite-recovered`, state-файл
+  `/var/lib/smoktolk-backup/full-offsite-failed`.
+- Лог: `/opt/smoktolk/bot/logs/backup-full-offsite.log`.
+
+**Уровни бэкапа (итог)**:
+
+| Уровень | Что               | Где                                              | Расписание (UTC)    | Размер   |
+|---------|-------------------|--------------------------------------------------|---------------------|----------|
+| L1      | БД (онлайн-снимок) | `/var/backups/smoktolk/` (тот же VPS)            | 01:00 (=04:00 MSK)  | ~3-4 КБ  |
+| L2      | БД (offsite)      | `yandex_native:smoktolk-backup/`                 | 23:50 (=02:50 MSK)  | ~3-4 КБ  |
+| L3      | Полный проект     | `yandex_native:smoktolk-backup-full/`            | 23:30 (=02:30 MSK)  | ~100 МБ  |
 
 ## 16. Файлы проекта
 

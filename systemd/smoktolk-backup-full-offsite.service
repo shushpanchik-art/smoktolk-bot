@@ -1,5 +1,5 @@
 [Unit]
-Description=SMOKTOLK full-project offsite backup to Yandex.Disk (tar.gz of /opt/smoktolk)
+Description=SMOKTOLK full-project offsite backup to Yandex.Disk (native API, tar.gz of /opt/smoktolk)
 Documentation=file:/opt/smoktolk/bot/scripts/backup_full_offsite.sh
 Documentation=file:/opt/smoktolk/bot/docs/BACKUP.md
 After=network-online.target

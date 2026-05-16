@@ -1,5 +1,5 @@
 [Unit]
-Description=SMOKTOLK offsite backup to Yandex.Disk (WebDAV via rclone)
+Description=SMOKTOLK offsite backup to Yandex.Disk (native API via rclone)
 Documentation=file:/opt/smoktolk/bot/scripts/backup_offsite.sh
 Documentation=file:/opt/smoktolk/bot/docs/BACKUP.md
 After=network-online.target smoktolk-backup.service

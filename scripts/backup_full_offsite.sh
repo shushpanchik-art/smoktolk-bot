@@ -37,7 +37,7 @@
 #   SOURCE_DIR             что архивируем (default: /opt/smoktolk)
 #   STAGING_DIR            где готовим tar.gz (default: /var/backups/smoktolk-full-offsite/staging)
 #   RCLONE_CONFIG          путь к rclone.conf
-#   RCLONE_REMOTE          remote:path (default: yandex:smoktolk-backup-full)
+#   RCLONE_REMOTE          remote:path (default: yandex_native:smoktolk-backup-full)
 #   FULL_RETENTION_DAYS    ротация на Я.Диске (default: 30)
 #   NOTIFY_SCRIPT          путь к notify_admin.sh
 #   LOCK_FILE              путь к flock-файлу
@@ -51,7 +51,7 @@ BOT_DIR="${BOT_DIR:-/opt/smoktolk/bot}"
 SOURCE_DIR="${SOURCE_DIR:-/opt/smoktolk}"
 STAGING_DIR="${STAGING_DIR:-/var/backups/smoktolk-full-offsite/staging}"
 RCLONE_CONFIG="${RCLONE_CONFIG:-/var/lib/smoktolk-rclone/rclone.conf}"
-RCLONE_REMOTE="${RCLONE_REMOTE:-yandex:smoktolk-backup-full}"
+RCLONE_REMOTE="${RCLONE_REMOTE:-yandex_native:smoktolk-backup-full}"
 FULL_RETENTION_DAYS="${FULL_RETENTION_DAYS:-30}"
 NOTIFY_SCRIPT="${NOTIFY_SCRIPT:-$BOT_DIR/scripts/notify_admin.sh}"
 LOCK_FILE="${LOCK_FILE:-$STAGING_DIR/.full-offsite.lock}"

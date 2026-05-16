@@ -144,7 +144,7 @@ def _make_backup(backup_dir: Path,
 def _make_rclone_config(rclone_cfg_dir: Path) -> Path:
     rclone_cfg_dir.mkdir(parents=True, exist_ok=True)
     cfg = rclone_cfg_dir / "rclone.conf"
-    cfg.write_text("[yandex]\ntype = webdav\nurl = https://example.invalid/\n",
+    cfg.write_text("[yandex_native]\ntype = yandex\n",
                    encoding="utf-8")
     cfg.chmod(0o600)
     return cfg
@@ -189,7 +189,7 @@ def _run_script(env_setup: dict, *, expect_rc: int = 0,
         "BACKUP_DIR": str(env_setup["backup_dir"]),
         "STAGING_DIR": str(env_setup["staging_dir"]),
         "RCLONE_CONFIG": str(env_setup["rclone_cfg"]),
-        "RCLONE_REMOTE": "yandex:test-backup",
+        "RCLONE_REMOTE": "yandex_native:test-backup",
         "OFFSITE_RETENTION_DAYS": "30",
         "NOTIFY_SCRIPT": str(env_setup["bin_dir"] / "notify_admin.sh"),
         "RCLONE_LOG": str(env_setup["rclone_log"]),
