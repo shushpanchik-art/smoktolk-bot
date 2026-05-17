@@ -6,10 +6,13 @@ from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
+from pathlib import Path as _Path
+
 import db
 import keyboards as kb
 from config import (DISCLAIMER_TEXT, RULES_TEXT, ADMIN_ID, LEVELS,
                     REFERRAL_REWARD_REFERRER)
+from services.admin_notify import notify_admin_new_user_bg
 from utils import normalize_phone, esc
 
 router = Router()
@@ -17,8 +20,6 @@ log = logging.getLogger(__name__)
 
 # Welcome-баннер: показывается при каждом /start (и новичкам, и вернувшимся).
 # Файл лежит локально, в .gitignore — поэтому шлём как FSInputFile.
-from pathlib import Path as _Path
-from services.admin_notify import notify_admin_new_user_bg
 _WELCOME_BANNER = _Path(__file__).resolve().parent.parent / "data" / "signboard_hor.jpg"
 _WELCOME_CAPTION = (
     "🏪 <b>SMOKTOLK</b>\n"
