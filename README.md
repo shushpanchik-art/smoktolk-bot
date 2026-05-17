@@ -23,7 +23,11 @@ Telegram-бот для табачного магазина: каталог, за
     │   ├── BACKUP.md           # Регламент бэкапов БД
     │   └── SECURITY.md         # Security posture, ADR по GitHub-тарифу
     ├── .github/
-    │   └── dependabot.yml      # Авто-обновление зависимостей
+    │   ├── CODEOWNERS          # Code owners для PR-ревью
+    │   ├── ISSUE_TEMPLATE/     # Шаблоны issues (bug, feature, config)
+    │   ├── dependabot.yml      # Авто-обновление зависимостей
+    │   ├── pull_request_template.md  # Шаблон PR
+    │   └── workflows/          # CI/CD GitHub Actions
     ├── requirements.txt
     ├── README.md
     └── CONTRIBUTING.md     # Гайд для контрибьюторов

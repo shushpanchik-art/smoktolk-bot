@@ -39,14 +39,14 @@
 ### 🐛 Сообщить о баге
 
 1. Проверь [open issues](https://github.com/shushpanchik-art/smoktolk-bot/issues) — возможно, баг уже зарегистрирован.
-2. Создай новый issue с описанием:
+2. Создай новый issue, используя [Bug report template](.github/ISSUE_TEMPLATE/bug_report.md):
    - Что произошло (ожидаемое vs реальное поведение).
    - Шаги воспроизведения.
    - Версия Python, ОС, логи (без секретов!).
 
 ### ✨ Предложить feature
 
-1. Сначала открой issue с тегом `enhancement` для обсуждения.
+1. Сначала открой issue, используя [Feature request template](.github/ISSUE_TEMPLATE/feature_request.md), с тегом `enhancement` для обсуждения.
 2. Опиши проблему, которую решает feature, и предложенное решение.
 3. Дождись отклика мейнтейнера — feature может конфликтовать с roadmap (см. SPEC.md §20).
 
