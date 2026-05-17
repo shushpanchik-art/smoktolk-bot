@@ -1,5 +1,4 @@
 """Общие фикстуры pytest: временная БД через подмену db.DB_PATH."""
-import pytest
 import pytest_asyncio
 
 import db

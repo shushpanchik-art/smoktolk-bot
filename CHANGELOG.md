@@ -31,6 +31,10 @@
   feature» дополнены прямыми ссылками на соответствующие issue templates,
   чтобы новый контрибьютор сразу попадал в правильный шаблон.
 
+### Changed
+- **chore(lint):** очищены ruff-ошибки `F401` (5 unused imports в `tests/`) и `E402` (7 module-level imports в `handlers/_admin_addon.py` и `handlers/start.py`). Импорты перенесены в начало файлов согласно PEP 8.
+
+
 ### Added — CONTRIBUTING.md: гайд для контрибьюторов (PR feature/contributing-guide)
 - **Новый документ `CONTRIBUTING.md`** в корне репозитория — единая точка
   входа для внешних контрибьюторов и нового онбординга:
