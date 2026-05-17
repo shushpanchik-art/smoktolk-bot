@@ -19,6 +19,9 @@ Telegram-бот для табачного магазина: каталог, за
     ├── scripts/
     │   ├── git-hooks/          # Git-hooks для разработки
     │   └── setup-hooks.sh      # Установщик git-hooks
+    ├── docs/
+    │   ├── BACKUP.md           # Регламент бэкапов БД
+    │   └── SECURITY.md         # Security posture, ADR по GitHub-тарифу
     ├── .github/
     │   └── dependabot.yml      # Авто-обновление зависимостей
     ├── requirements.txt
@@ -67,10 +70,15 @@ Telegram-бот для табачного магазина: каталог, за
 
 - `.env` и `backups/` — в `.gitignore`, **никогда не попадают в репозиторий**
 - **gitleaks** проверяет каждый коммит локально (pre-commit hook)
+- **ruff** линтит staged Python-файлы локально на каждый commit (pre-commit hook); тот же ruff 0.15.12 гоняется в CI на PR
 - **pre-push hook** блокирует прямой `git push` в ветку `main` (см. подраздел «Защита ветки `main`» ниже)
 - **Dependabot** еженедельно проверяет зависимости на уязвимости
 - **Бэкапы БД**: ежедневно в 04:00 MSK через `smoktolk-backup.timer` (systemd) от user `smoktolk` (`/var/backups/smoktolk/`), hash-дедупликация, retention 150 дней / 5 GiB, lock через `flock`, Telegram-алерты при сбое. См. `docs/BACKUP.md` и SPEC §15
 - Если pre-commit hook нашёл секрет — коммит отменяется
+
+### Документ-источник по security-решениям
+
+Все архитектурные решения по защите репозитория, принятые риски, триггеры пересмотра и состав локальных hooks зафиксированы в **[`docs/SECURITY.md`](docs/SECURITY.md)** — это канонический документ. Изменения в подходе вносятся туда, README и SPEC ссылаются на него.
 
 ### Защита ветки `main`
 
