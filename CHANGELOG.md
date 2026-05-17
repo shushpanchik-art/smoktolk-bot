@@ -8,6 +8,31 @@
 
 ## [Unreleased]
 
+### Added — CONTRIBUTING.md: гайд для контрибьюторов (PR feature/contributing-guide)
+- **Новый документ `CONTRIBUTING.md`** в корне репозитория — единая точка
+  входа для внешних контрибьюторов и нового онбординга:
+  - Code of Conduct и принципы коммуникации в проекте.
+  - Способы внести вклад: bug reports, feature requests, документация, код.
+  - Полный setup окружения разработчика (Python 3.11, venv, gitleaks,
+    git hooks через `scripts/setup-hooks.sh`).
+  - Workflow разработки: fork → feature branch → PR → squash-merge.
+  - Стиль кода (ruff, PEP 8) и Conventional Commits с примерами.
+  - Quality gates: что проверяет pre-commit, pre-push, CI (5 джобов).
+  - Pull request lifecycle: чек-лист, review process, рекомендации по
+    размеру PR.
+  - Матрица соответствия «изменение → какой документ обновить».
+  - Security guidelines: что нельзя коммитить, что делать при утечке.
+  - Полезные ссылки на ключевые документы проекта и внешние стандарты.
+- `.github/pull_request_template.md`: добавлен заголовок-напоминание для
+  новых контрибьюторов со ссылкой на `CONTRIBUTING.md`.
+- `docs/SECURITY.md`: добавлена секция «См. также» с обратной ссылкой на
+  `CONTRIBUTING.md`.
+- `scripts/setup-hooks.sh`: финальное сообщение установщика теперь
+  указывает на `CONTRIBUTING.md` как на полный гайд по дальнейшим шагам.
+- `README.md`: раздел «Документация» дополнен ссылками на `CONTRIBUTING.md`,
+  `docs/SECURITY.md`, `docs/BACKUP.md`; раздел «Структура» дополнен путём
+  `CONTRIBUTING.md`.
+
 ### Added — Локальные quality-hooks: ruff в pre-commit + ADR по security posture (PR feature/local-quality-hooks)
 - `scripts/git-hooks/pre-commit`: добавлена проверка staged `*.py` через
   `venv/bin/ruff check` (fallback на системный `ruff`) с теми же `--exclude`,

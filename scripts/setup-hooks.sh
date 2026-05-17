@@ -46,3 +46,6 @@ if [ "$MISSING" -eq 1 ]; then
     exit 0
 fi
 echo "🎉 Готово. Hook'и активны при следующем git commit / git push."
+
+echo ""
+echo "📖 См. CONTRIBUTING.md для полного гайда по workflow разработки."
