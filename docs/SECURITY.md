@@ -81,3 +81,7 @@ Hooks хранятся в `scripts/git-hooks/` (под VCS) и копируют�
 Если ты внешний исследователь и нашёл уязвимость — открой private security
 advisory через GitHub UI (`Security` → `Report a vulnerability`) или напиши
 владельцу репозитория в Telegram (контакт в профиле GitHub).
+
+## См. также
+
+- [CONTRIBUTING.md](../CONTRIBUTING.md) — общий гайд для контрибьюторов, включая setup hooks и workflow разработки.

@@ -25,7 +25,8 @@ Telegram-бот для табачного магазина: каталог, за
     ├── .github/
     │   └── dependabot.yml      # Авто-обновление зависимостей
     ├── requirements.txt
-    └── README.md
+    ├── README.md
+    └── CONTRIBUTING.md     # Гайд для контрибьюторов
 
 ---
 
@@ -115,6 +116,9 @@ Telegram-бот для табачного магазина: каталог, за
 
 - **[SPEC.md](SPEC.md)** — полная спецификация проекта, архитектура, инциденты и уроки
 - **[CHANGELOG.md](CHANGELOG.md)** — история изменений по версиям
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — гайд для контрибьюторов: setup, workflow, стиль кода
+- **[docs/SECURITY.md](docs/SECURITY.md)** — security posture и ADR
+- **[docs/BACKUP.md](docs/BACKUP.md)** — регламент бэкапов БД
 
 ---
 
