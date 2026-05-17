@@ -20,7 +20,6 @@
 10. concurrent flock → exit 0 без rclone и без notify
 (11-12 — в следующем коммите)
 """
-import os
 import stat
 import subprocess
 import textwrap

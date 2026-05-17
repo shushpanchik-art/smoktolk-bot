@@ -12,12 +12,17 @@ from datetime import datetime, timezone, timedelta
 
 import aiosqlite
 from aiogram import F, Router
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import (
     CallbackQuery, BufferedInputFile,
-    InlineKeyboardButton, InlineKeyboardMarkup
+    InlineKeyboardButton, InlineKeyboardMarkup,
+    Message,
 )
 
+import db as _db
 from config import ADMIN_ID, DB_PATH
+from datetime import datetime as _dt
 
 router = Router()
 log = logging.getLogger(__name__)
@@ -134,12 +139,6 @@ async def adm_export_new(cb: CallbackQuery):
 # ============================================================
 # Админ: изменить дату рождения пользователя (force=True)
 # ============================================================
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message
-from datetime import datetime as _dt
-
-import db as _db
 
 
 class AdmBday(StatesGroup):
