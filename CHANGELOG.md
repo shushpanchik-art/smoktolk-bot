@@ -8,6 +8,29 @@
 
 ## [Unreleased]
 
+### Added — Issue templates: bug report, feature request, config (PR feature/issue-templates)
+- **`.github/ISSUE_TEMPLATE/bug_report.md`**: структурированный шаблон для
+  bug reports. Секции: описание, шаги воспроизведения, ожидаемое/фактическое
+  поведение, окружение (где воспроизводится, версия бота, Python, OS),
+  логи/скриншоты (в `<details>` для компактности), чек-лист контрибьютора.
+  Labels: `bug`, `needs-triage`. Напоминание о security-related багах с
+  редиректом в private security advisory (см. `docs/SECURITY.md` §«Как
+  сообщить об уязвимости»).
+- **`.github/ISSUE_TEMPLATE/feature_request.md`**: шаблон для feature
+  requests. Секции: проблема (Why), предложенное решение (What),
+  альтернативы (Considered), влияние на проект (SPEC/README/тесты/миграции),
+  готовность контрибьютора реализовать, дополнительный контекст. Labels:
+  `enhancement`, `needs-discussion`. Явно отсылает к SPEC.md §20 (roadmap)
+  как к источнику истины по приоритизации.
+- **`.github/ISSUE_TEMPLATE/config.yml`**: настройки issue chooser GitHub.
+  `blank_issues_enabled: false` — нельзя создать issue без шаблона, что
+  снижает количество низкокачественных обращений. Контактные ссылки:
+  Security advisory (`/security/advisories/new`), Discussions (если включены
+  в будущем), документация (`docs/`).
+- **`CONTRIBUTING.md`**: разделы «🐛 Сообщить о баге» и «✨ Предложить
+  feature» дополнены прямыми ссылками на соответствующие issue templates,
+  чтобы новый контрибьютор сразу попадал в правильный шаблон.
+
 ### Added — CONTRIBUTING.md: гайд для контрибьюторов (PR feature/contributing-guide)
 - **Новый документ `CONTRIBUTING.md`** в корне репозитория — единая точка
   входа для внешних контрибьюторов и нового онбординга:

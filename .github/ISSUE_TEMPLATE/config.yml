@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Security vulnerability
+    url: https://github.com/shushpanchik-art/smoktolk-bot/security/advisories/new
+    about: "Нашёл уязвимость? НЕ создавай публичный issue — открой private security advisory."
+  - name: 📖 Документация и FAQ
+    url: https://github.com/shushpanchik-art/smoktolk-bot/blob/main/README.md
+    about: "Перед созданием issue загляни в README, SPEC.md и CONTRIBUTING.md."
+  - name: 💬 Вопрос / обсуждение
+    url: https://t.me/shushpanchik_art
+    about: "Общие вопросы и обсуждения — в Telegram, не в Issues."
