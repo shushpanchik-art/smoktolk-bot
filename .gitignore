@@ -36,6 +36,7 @@ Thumbs.db
 *.bak-*
 venv/
 .coverage
+coverage.xml
 htmlcov/
 .pytest_cache/
 
