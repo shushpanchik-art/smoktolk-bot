@@ -8,6 +8,39 @@
 
 ## [Unreleased]
 
+### Added — Coverage report: pytest-cov + badge (PR chore/pytest-cov-and-badge)
+- **`.coveragerc`**: конфигурация coverage.py. `branch = True` для точности
+  (учитывает оба ветвления if/else). Исключает `venv/`, `tests/`,
+  `make_sample_catalog.py` (одноразовая утилита). `exclude_lines` для
+  декораторов вроде `if TYPE_CHECKING:` и `def __repr__`. Отчёты: term-missing
+  (CI), HTML (`htmlcov/`, локально), XML (`coverage.xml`, artifact).
+- **`requirements-dev.txt`**: добавлен `pytest-cov==7.1.0` (точная фиксация
+  как у остальных зависимостей).
+- **`.github/workflows/ci.yml`** — job `tests`: шаг `Run pytest` заменён на
+  `Run pytest with coverage` с флагами `--cov=. --cov-config=.coveragerc
+  --cov-fail-under=10`. Порог 10% выбран как baseline текущего покрытия
+  (минус 1 п.п. для устойчивости к флакам). Добавлены два artifact-upload
+  шага: HTML и XML отчёты с `if: always()`, чтобы отчёт сохранялся даже при
+  падении тестов. Retention 14 дней. `actions/upload-artifact` запинен к
+  SHA `65c4c4a1` (v4) — согласно security policy CI (см. `docs/SECURITY.md`).
+- **`.gitignore`**: добавлен `coverage.xml` (рядом с уже существующими
+  `.coverage` и `htmlcov/`) — XML-отчёт не должен попадать в git.
+- **`README.md`**:
+  - coverage-badge `coverage-11%-red` (shields.io, статичный — обновляется
+    вручную при значимом росте; миграция на Codecov — отдельный PR при
+    необходимости);
+  - новая секция «## Тестирование» с командами запуска, текущим покрытием
+    по модулям, описанием CI-policy (`--cov-fail-under`).
+- **`SPEC.md` §20**: пункт «pytest-cov + coverage-бейдж» помечен как
+  выполненный, пункт в DoD-чек-листе §28 закрыт.
+
+**Текущее покрытие (baseline):** 11.36% общего, 261/2129 строк продакшн-кода.
+Прицельно протестировано: `config.py` 97%, `services/admin_notify.py` 91%,
+`db.py` 43%. Не покрыты (0%): все `handlers/*`, `webhook.py`, `tasks.py`,
+`keyboards.py`, `utils.py`, `bot.py`, `catalog.py`, `crash_alert.py`. Это
+honest baseline, не цель — рост покрытия handlers будет отдельными PR.
+
+
 ### Added — Issue templates: bug report, feature request, config (PR feature/issue-templates)
 - **`.github/ISSUE_TEMPLATE/bug_report.md`**: структурированный шаблон для
   bug reports. Секции: описание, шаги воспроизведения, ожидаемое/фактическое

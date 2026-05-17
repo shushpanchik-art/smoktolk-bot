@@ -4,6 +4,7 @@
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)
 ![Security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)
+![Coverage](https://img.shields.io/badge/coverage-11%25-red.svg)
 
 
 Telegram-бот для табачного магазина: каталог, заказы, доставка, админ-панель.
@@ -123,6 +124,39 @@ Telegram-бот для табачного магазина: каталог, за
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — гайд для контрибьюторов: setup, workflow, стиль кода
 - **[docs/SECURITY.md](docs/SECURITY.md)** — security posture и ADR
 - **[docs/BACKUP.md](docs/BACKUP.md)** — регламент бэкапов БД
+
+---
+
+## Тестирование
+
+Юнит-тесты (`pytest`) и Bash-тесты бэкап-скриптов покрывают критичные узлы:
+БД, начисления баллов, верификация возраста, бэкап-скрипты с healthcheck.
+
+```bash
+# Установка dev-зависимостей (один раз)
+pip install -r requirements-dev.txt
+
+# Запуск всех тестов
+pytest
+
+# С покрытием (term + HTML отчёт в htmlcov/index.html)
+pytest --cov=. --cov-config=.coveragerc --cov-report=term-missing --cov-report=html
+```
+
+**Текущее покрытие: 11%** (см. badge выше). Это baseline после введения
+`pytest-cov`. Прицельно покрыто:
+
+- `config.py` (97%) — загрузка конфигурации
+- `services/admin_notify.py` (91%) — алерты админу
+- `db.py` (43%) — критичные операции с БД (points, register_purchase, levels)
+
+CI блокирует regress: `--cov-fail-under=10` в `.github/workflows/ci.yml`.
+При значимом росте покрытия — поднимаем порог и обновляем badge в README.
+
+Artifacts CI (доступны 14 дней в GitHub Actions runs):
+
+- `coverage-html-<run_id>` — HTML-отчёт (открыть `index.html`)
+- `coverage-xml-<run_id>` — XML для внешних инструментов (Codecov и т.п.)
 
 ---
 

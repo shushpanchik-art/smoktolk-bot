@@ -628,8 +628,9 @@ CREATE TABLE users (
 
 ### 🟡 Средний приоритет — качество кода и тестирование
 
-- **`pytest-cov` + coverage-бейдж в README** — последний остаточный TODO из
-  CHANGELOG, делается отдельным PR `chore/pytest-cov-and-badge`
+- ~~**`pytest-cov` + coverage-бейдж в README**~~ — ✅ выполнено в PR
+  `chore/pytest-cov-and-badge`. Baseline 11%, CI блокирует regress
+  (`--cov-fail-under=10`), HTML/XML artifacts доступны 14 дней
 - **Покрыть тестами `tasks.daily_loop`** (сгорание, рассылки, отчёты) —
   критичный фоновый процесс, сейчас не покрыт
 - **PR template** (`.github/PULL_REQUEST_TEMPLATE.md`) — стандартизировать
@@ -1344,7 +1345,7 @@ markdown-рендер просто покажет код-блок как абз�
 🟢 **P3 — качество:**
 - [ ] Sanitize `data/catalog.xlsx` styles один раз при импорте и сохранить
     «чистую» версию — убрать warning при каждом старте бота.
-- [ ] Coverage report (`pytest-cov` + бейдж).
+- [x] Coverage report (`pytest-cov` + бейдж). _PR chore/pytest-cov-and-badge._
 - [ ] Тесты на FSM-флоу `AdmBday` (моки aiogram) — сейчас покрыт только
     слой `db.set_birthday`.
 - [ ] Кнопка «🚫 Заблокировать юзера» в админ-карточке.

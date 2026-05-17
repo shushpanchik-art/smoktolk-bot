@@ -1,0 +1,40 @@
+# Конфигурация coverage.py для smoktolk-bot.
+# Запуск: pytest --cov (см. CI и docs/TESTING.md, если будет).
+# Reports: term-missing (CI), html (локально), xml (artifact).
+
+[run]
+source = .
+branch = True
+# Исключаем то, что не является продакшн-кодом бота:
+# - venv/.venv — установленные пакеты
+# - tests/ — сами тесты (искажают метрику в большую сторону)
+# - htmlcov/ — артефакты coverage
+# - make_sample_catalog.py — одноразовая утилита-генератор данных
+omit =
+    venv/*
+    .venv/*
+    tests/*
+    .git/*
+    htmlcov/*
+    setup.py
+    make_sample_catalog.py
+
+[report]
+# Исключаем строки, которые не имеет смысла покрывать тестами:
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    \.\.\.
+show_missing = True
+skip_covered = False
+# Точность процента — 1 знак после запятой.
+precision = 1
+
+[html]
+directory = htmlcov
+
+[xml]
+output = coverage.xml
