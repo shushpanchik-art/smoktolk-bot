@@ -8,6 +8,23 @@
 
 ## [Unreleased]
 
+### Added — Локальные quality-hooks: ruff в pre-commit + ADR по security posture (PR feature/local-quality-hooks)
+- `scripts/git-hooks/pre-commit`: добавлена проверка staged `*.py` через
+  `venv/bin/ruff check` (fallback на системный `ruff`) с теми же `--exclude`,
+  что и CI. gitleaks-проверка сохранена; обе работают в одном hook'е, итог —
+  единый `EXIT_CODE`. Без `--fix` (намеренно: коммит ничего не правит сам).
+- `scripts/setup-hooks.sh`: установщик теперь проверяет наличие `ruff`
+  (`venv/bin/ruff` или PATH) дополнительно к `gitleaks`. Отсутствие → варнинг
+  и `exit 0` (hooks ставятся, но не сработают пока утилита не установлена).
+- **Новый документ `docs/SECURITY.md`** — каноничное место для security
+  posture: ADR «почему не платим GitHub Team», состав и митигации локальных
+  hooks, принимаемые остаточные риски, триггеры пересмотра тарифа.
+- README.md: раздел «Безопасность» теперь упоминает ruff в pre-commit и
+  ссылается на `docs/SECURITY.md` как источник истины; раздел «Структура»
+  дополнен путём `docs/SECURITY.md`.
+- SPEC.md §21.8 переименован в «Локальные quality-hooks (pre-commit +
+  pre-push)», добавлен подраздел «Состав hooks» и ссылка на `docs/SECURITY.md`.
+
 ### Fixed — L1 healthcheck: false-positive после safety-net (PR #ops-healthcheck-safety-net)
 - `scripts/backup_healthcheck.sh`: порог `MAX_AGE_HOURS` поднят с **36 → 192 часа**
   (= `SAFETY_NET_DAYS=7 × 24 + 24ч запаса`).

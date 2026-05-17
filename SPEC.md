@@ -800,7 +800,27 @@ CREATE TABLE users (
 - Все 4 джоба — **блокирующие** (без `continue-on-error`). Красный CI = нельзя мержить.
 - Исключения для `nosec B608`, `noqa` и подобных аннотаций оформляются в коде с обязательным комментарием-обоснованием.
 
-### 21.8 Pre-push hook: защита ветки `main`
+### 21.8 Локальные quality-hooks (pre-commit + pre-push)
+> **Канонический документ:** см. [`docs/SECURITY.md`](../docs/SECURITY.md) —
+> там зафиксированы архитектурные решения, принимаемые риски и триггеры
+> пересмотра (переход на GitHub Team). Этот раздел SPEC — техническое
+> описание реализации; стратегические решения живут в `docs/SECURITY.md`.
+
+#### Состав hooks
+
+- **`scripts/git-hooks/pre-commit`** — две проверки на staged-версиях файлов:
+  - `gitleaks dir` — поиск секретов (см. §17.4);
+  - `ruff check` — линт `*.py` через `venv/bin/ruff` или системный `ruff`,
+    тем же `--exclude venv data backups logs`, что в CI.
+  Падение любой проверки → коммит отменён. Обход: `git commit --no-verify`.
+- **`scripts/git-hooks/pre-push`** — блокирует push в `refs/heads/main`
+  (в т.ч. удаление и push через нестандартный refspec). Обход:
+  `git push --no-verify`.
+
+Установка обоих: `./scripts/setup-hooks.sh` (после `git clone` или после
+изменения файлов в `scripts/git-hooks/`).
+
+#### Server-side защита (Branch Protection)
 
 GitHub Branch Protection для приватных репозиториев требует платного тарифа (Pro/Team/Enterprise) и в проекте не используется (Decision см. в конце раздела). Для частичной защиты `main` на free-тарифе реализован локальный git pre-push hook, блокирующий прямой push в `main`. Это **не эквивалент** server-side защиты: hook обходится через `--no-verify` и не работает на машине, где не выполнен `setup-hooks.sh`.
 
