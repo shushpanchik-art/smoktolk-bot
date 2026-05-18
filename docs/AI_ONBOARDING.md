@@ -93,6 +93,7 @@ Telegram-бот лояльности для табачного магазина 
 ## 🛡 Локальные quality-gates
 
 **Pre-commit** (`.git/hooks/pre-commit`, ставится через `./scripts/setup-hooks.sh`):
+- **branch guard** — блокирует прямой коммит в `main` (симметрично pre-push).
 - `gitleaks` — блокирует коммит при находке секретов.
 - `ruff check` на staged-файлах.
 
@@ -110,6 +111,7 @@ Telegram-бот лояльности для табачного магазина 
 | `ruff` (informational) | ✅ | CI `lint` |
 | Coverage gate `--cov-fail-under=10` | ✅ | CI `tests` (PR #60) |
 | `gitleaks` в pre-commit | ✅ | `.git/hooks/pre-commit` |
+| Pre-commit запрет коммита в `main` | ✅ (client-side) | `.git/hooks/pre-commit` (branch guard) |
 | Pre-push защита `main` | ✅ (client-side) | `.git/hooks/pre-push` |
 | CODEOWNERS | ✅ | `.github/CODEOWNERS` |
 | Backup fsync durability | ✅ | PR #53 |

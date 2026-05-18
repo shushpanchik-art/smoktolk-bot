@@ -752,7 +752,7 @@ CREATE TABLE users (
 ### 21.4 Защита от утечек
 
 - gitleaks 8.21.2 в `/usr/local/bin/gitleaks`
-- Pre-commit hook: `.git/hooks/pre-commit` → симлинк на `scripts/git-hooks/pre-commit`
+- Pre-commit hook: `.git/hooks/pre-commit` (копия `scripts/git-hooks/pre-commit`, ставится через `./scripts/setup-hooks.sh`)
 - При попытке закоммитить файл с токеном — commit блокируется
 
 ### 21.5 История Dependabot PR
@@ -821,8 +821,12 @@ CREATE TABLE users (
 
 #### Состав hooks
 
-- **`scripts/git-hooks/pre-commit`** — две проверки на staged-версиях файлов:
-  - `gitleaks dir` — поиск секретов (см. §17.4);
+- **`scripts/git-hooks/pre-commit`** — три проверки:
+  - **branch guard** — запрет прямого коммита в защищённую ветку `main`.
+    Сравнивает `git symbolic-ref --short HEAD` со списком `PROTECTED_BRANCHES`.
+    Срабатывает до gitleaks/ruff, выводит подсказку по правильному PR-flow.
+    Симметрична блоку в `pre-push` (тот блокирует push в `refs/heads/main`).
+  - `gitleaks dir` — поиск секретов на staged-версиях файлов (см. §17.4).
   - `ruff check` — линт `*.py` через `venv/bin/ruff` или системный `ruff`,
     тем же `--exclude venv data backups logs`, что в CI.
   Падение любой проверки → коммит отменён. Обход: `git commit --no-verify`.
@@ -892,8 +896,9 @@ GitHub Branch Protection для приватных репозиториев тр
 
 **Связь с другими защитами:**
 
-- pre-commit hook (gitleaks, §21.4) — защищает от утечки секретов в коммит;
-- pre-push hook (§21.8) — защищает структуру истории `main`;
+- pre-commit hook (§21.8) — защищает от утечки секретов (gitleaks, §21.4),
+  от стиля (ruff) и от прямого коммита в `main` (branch guard);
+- pre-push hook (§21.8) — защищает структуру истории `main` (запрет push в `refs/heads/main`);
 - CI workflow (§21.7) — защищает качество кода и зависимостей.
 
 Три слоя защиты независимы и работают в разное время процесса разработки.

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Pre-commit hook: локальные проверки качества и безопасности staged-файлов.
+# Pre-commit hook: локальные проверки качества и безопасности.
 #
 # Проверки:
-#   1) gitleaks — поиск секретов в staged-версиях файлов
-#   2) ruff     — линт Python staged-файлов (только check, без --fix)
+#   0) branch guard — запрет прямого коммита в защищённые ветки
+#   1) gitleaks    — поиск секретов в staged-версиях файлов
+#   2) ruff        — линт Python staged-файлов (только check, без --fix)
 #
 # Запуск устанавливается через ./scripts/setup-hooks.sh
 # Обход (на свой страх и риск): git commit --no-verify
@@ -14,6 +15,29 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
+
+# ── (0) Branch guard: запрет прямого коммита в защищённые ветки ─────────
+# Источник истины — то же, что в pre-push (refs/heads/main).
+# Здесь сравниваем без префикса refs/heads/.
+PROTECTED_BRANCHES="main"
+CURRENT_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo "__DETACHED__")"
+
+for protected in $PROTECTED_BRANCHES; do
+    if [ "$CURRENT_BRANCH" = "$protected" ]; then
+        echo -e "${RED}🛑 Прямой коммит в защищённую ветку запрещён: ${CURRENT_BRANCH}${NC}"
+        echo ""
+        echo -e "${YELLOW}💡 Правильный flow:${NC}"
+        echo "   1. git checkout -b feature/название    # или chore/, fix/, docs/"
+        echo "   2. git add ... && git commit -m '...'"
+        echo "   3. git push origin feature/название"
+        echo "   4. Открой Pull Request на GitHub"
+        echo "   5. Дождись CI и сделай merge через UI"
+        echo ""
+        echo -e "${YELLOW}⚠️  Экстренный обход (только если 100% понимаешь риск):${NC}"
+        echo "   git commit --no-verify"
+        exit 1
+    fi
+done
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 RUFF_BIN=""
