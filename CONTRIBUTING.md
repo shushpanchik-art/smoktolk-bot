@@ -147,7 +147,7 @@
 
        git checkout -b feature/short-descriptive-name
 
-   Не работай напрямую в `main` — local pre-push hook это заблокирует.
+   Не работай напрямую в `main` — local pre-commit hook заблокирует коммит, а pre-push hook — push (см. SPEC §21.8).
 
 3. **Внеси изменения** небольшими атомарными коммитами.
 
@@ -227,6 +227,7 @@ PR title должен следовать тому же формату Convention
 
 | Инструмент | Что проверяет | Источник |
 |---|---|---|
+| **branch guard** | Запрет прямого коммита в `main` | `scripts/git-hooks/pre-commit` |
 | `gitleaks` | Секреты в staged changes | `scripts/git-hooks/pre-commit` |
 | `ruff check` | Линтинг изменённых `.py` | то же |
 
