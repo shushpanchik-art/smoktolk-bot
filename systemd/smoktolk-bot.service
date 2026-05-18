@@ -1,0 +1,91 @@
+# /etc/systemd/system/smoktolk-bot.service
+#
+# Source of Truth — этот файл является эталоном для деплоя.
+# Деплой: ./scripts/deploy_systemd.sh
+#
+# Дополнения через drop-in'ы в systemd/smoktolk-bot.service.d/:
+#   10-alerts.conf    — Restart-стратегия, RuntimeDirectory, DOWN-алерт
+#   20-resources.conf — OOM-защита, лимиты памяти/swap/tasks
+#
+# Hardening (см. systemd.exec(5), `systemd-analyze security smoktolk-bot.service`):
+# baseline 9.2 UNSAFE → после этого файла ~2.x OK.
+#
+# История:
+#   PR #?? (feat/ops-harden-bot-service) — добавлен runtime hardening
+#   до этого: только User=smoktolk, без NoNewPrivileges/ProtectSystem/Restrict*
+
+[Unit]
+Description=Smoktolk Telegram Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=smoktolk
+Group=smoktolk
+WorkingDirectory=/opt/smoktolk/bot
+ExecStart=/opt/smoktolk/bot/venv/bin/python /opt/smoktolk/bot/bot.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# ═══════════════════════════════════════════════════════════════
+# Runtime Hardening (см. docs/SECURITY.md §Runtime Hardening)
+# ═══════════════════════════════════════════════════════════════
+
+# --- Фаза 1: FS isolation ---
+# NoNewPrivileges: запрещает setuid-эскалацию (бот не использует sudo/setuid).
+NoNewPrivileges=yes
+# PrivateTmp: приватный /tmp и /var/tmp (бот использует io.BytesIO, не файлы).
+PrivateTmp=yes
+# ProtectSystem=strict: весь FS read-only, кроме ReadWritePaths и RuntimeDirectory.
+ProtectSystem=strict
+# ProtectHome: /home, /root, /run/user недоступны. У smoktolk HOME=/opt/smoktolk
+# (не /home/*), поэтому безопасно.
+ProtectHome=yes
+# Что бот реально пишет:
+#   /opt/smoktolk/bot/data/    — SQLite БД, catalog.xlsx, .sanitized.xlsx
+#   /opt/smoktolk/bot/logs/    — bot.log + ротация *.log.1..5
+# RuntimeDirectory=smoktolk-bot уже даёт RW на /run/smoktolk-bot/ автоматически.
+ReadWritePaths=/opt/smoktolk/bot/data /opt/smoktolk/bot/logs
+# UMask: создаваемые файлы 0640/0750 вместо 0644/0755.
+UMask=0027
+
+# --- Фаза 2: Kernel & namespace isolation ---
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+# Бот однопоточный async (Threads=2: main + asyncio executor), нет fork/multiprocessing,
+# нет ctypes/JIT — все Restrict* безопасны.
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+PrivateDevices=yes
+# Сеть: TCP к Telegram (149.154.166.*) + LISTEN 127.0.0.1:8080. UNIX-сокеты для journal.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# User=smoktolk уже даёт CapEff=0, но фиксируем явно.
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# --- Фаза 3: Syscall filtering ---
+# @system-service — стандартный whitelist для сервисов (включает mmap, openat, recv*,
+# send*, futex и т.д.). Исключаем @privileged, @resources, @debug, @cpu-emulation,
+# @obsolete — бот их не использует.
+# Нарушение → EPERM (а не SIGSYS), бот логирует ошибку, не падает.
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @debug @cpu-emulation @obsolete
+SystemCallErrorNumber=EPERM
+SystemCallArchitectures=native
+
+# MemoryDenyWriteExecute НЕ включён — может ломать C-extensions Pillow/openpyxl/aiosqlite.
+# Если в будущем будет CI-тест на запуск с MDWE и он пройдёт — можно включить.
+
+[Install]
+WantedBy=multi-user.target
