@@ -92,19 +92,28 @@ Telegram-бот лояльности для табачного магазина 
 
 ## 🛡 Локальные quality-gates
 
-**Pre-commit** (`.git/hooks/pre-commit`, ставится через `./scripts/setup-hooks.sh`):
+Ставятся одной командой: `./scripts/setup-hooks.sh` (копирует `scripts/git-hooks/*` в `.git/hooks/`, не симлинкует — см. SPEC §21.8).
+
+**Pre-commit** (`.git/hooks/pre-commit`):
 - **branch guard** — блокирует прямой коммит в `main` (симметрично pre-push).
 - `gitleaks` — блокирует коммит при находке секретов.
 - `ruff check` на staged-файлах.
 
-**Pre-push** — синтаксис + pytest + блокирует прямой push в `refs/heads/main`.
+**Pre-push** (`.git/hooks/pre-push`, hardened в PR chore/harden-pre-push-and-refresh-onboarding):
+- Блокирует push в защищённые ветки (по умолчанию `refs/heads/main`).
+- Список защищённых веток конфигурируется через env var `SMOKTOLK_PROTECTED_BRANCHES` (space-separated, формат `refs/heads/<name>`).
+- Покрывает 6 edge-cases: прямой push, refspec вида `feature:main`, `--delete`, `--force`, `--all`/matching push, detached HEAD.
+- Audit log в `.git/branch-guard.log` (не уходит в репо, локальный за-сессионный лог): `BLOCKED_PUSH` / `BLOCKED_DELETE` с timestamp и git user.email.
+- Обход (на свой страх и риск): `git push --no-verify`.
+
+**Замечание:** server-side Branch Protection недоступен на GitHub Free для приватных репо, поэтому pre-push — единственная клиентская защита. См. accepted risk в таблице ниже.
 
 ## 🔒 Безопасность: что реализовано / что отложено
 
 | Контроль | Статус | Где описано |
 |---|---|---|
 | 2FA на GitHub | ✅ | manual |
-| Dependabot (pip weekly, GH Actions monthly) | ✅ | `.github/dependabot.yml` |
+| Dependabot (pip weekly, GH Actions monthly, лимит 10 PR) | ✅ | `.github/dependabot.yml` |
 | Actions pinned to SHA | ✅ | `.github/workflows/ci.yml` |
 | `pip-audit` (блокирующий) | ✅ | CI `deps` |
 | `bandit` (informational) | ✅ | CI `security` |
@@ -112,7 +121,7 @@ Telegram-бот лояльности для табачного магазина 
 | Coverage gate `--cov-fail-under=10` | ✅ | CI `tests` (PR #60) |
 | `gitleaks` в pre-commit | ✅ | `.git/hooks/pre-commit` |
 | Pre-commit запрет коммита в `main` | ✅ (client-side) | `.git/hooks/pre-commit` (branch guard) |
-| Pre-push защита `main` | ✅ (client-side) | `.git/hooks/pre-push` |
+| Pre-push защита `main` (audit log + env var конфиг) | ✅ (client-side) | `.git/hooks/pre-push`, `.git/branch-guard.log` |
 | CODEOWNERS | ✅ | `.github/CODEOWNERS` |
 | Backup fsync durability | ✅ | PR #53 |
 | systemd runtime hardening (1.3 OK) | ✅ | PR #61, `docs/SECURITY.md §4` |

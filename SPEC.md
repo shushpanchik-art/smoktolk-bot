@@ -830,9 +830,17 @@ CREATE TABLE users (
   - `ruff check` — линт `*.py` через `venv/bin/ruff` или системный `ruff`,
     тем же `--exclude venv data backups logs`, что в CI.
   Падение любой проверки → коммит отменён. Обход: `git commit --no-verify`.
-- **`scripts/git-hooks/pre-push`** — блокирует push в `refs/heads/main`
-  (в т.ч. удаление и push через нестандартный refspec). Обход:
-  `git push --no-verify`.
+- **`scripts/git-hooks/pre-push`** — блокирует push в защищённые ветки.
+  - По умолчанию защищена `refs/heads/main`; список настраивается через
+    env var `SMOKTOLK_PROTECTED_BRANCHES` (space-separated, формат
+    `refs/heads/<name>`) — задел под будущий `develop`/`release/*`.
+  - Покрывает 6 edge-cases: прямой push, refspec вида `feature:main`,
+    `git push --delete`, `git push --force`, `git push --all`/matching,
+    detached HEAD.
+  - **Audit log** в `.git/branch-guard.log` (локальный, не уходит в репо):
+    каждая блокировка фиксируется как `BLOCKED_PUSH` / `BLOCKED_DELETE`
+    с timestamp (ISO-8601) и `git config user.email`.
+  - Обход: `git push --no-verify` (логируется отдельно как принятый риск).
 
 Установка обоих: `./scripts/setup-hooks.sh` (после `git clone` или после
 изменения файлов в `scripts/git-hooks/`).
@@ -849,7 +857,10 @@ GitHub Branch Protection для приватных репозиториев тр
 **Что блокируется:**
 
 - Прямой push в `refs/heads/main` (в том числе через явный refspec `git push origin HEAD:main` из любой ветки).
-- Удаление ветки `main` (`git push origin --delete main`).
+- Удаление ветки `main` (`git push origin --delete main`) — детектируется по ZERO_SHA в `local_sha`.
+- `git push --force` в `main` (force-флаг не имеет значения — хук проверяет remote_ref, а не аргументы).
+- `git push --all` / matching push — отфильтрует `main` из набора refs.
+- Push из detached HEAD в `refs/heads/main` — проверяется remote_ref из stdin, не зависит от `symbolic-ref`.
 
 **Что разрешено:**
 

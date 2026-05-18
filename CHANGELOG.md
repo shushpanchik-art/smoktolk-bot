@@ -8,6 +8,80 @@
 
 ## [Unreleased]
 
+### Added — Pre-push hardening + onboarding refresh (PR chore/harden-pre-push-and-refresh-onboarding)
+
+- **`scripts/git-hooks/pre-push`** — расширен и упрочнён:
+  - **Конфигурируемый список защищённых веток** через env var
+    `SMOKTOLK_PROTECTED_BRANCHES` (space-separated, формат
+    `refs/heads/<name>`). По умолчанию `refs/heads/main` — поведение не
+    меняется. Задел под будущий `develop`/`release/*` без правок кода.
+  - **Audit log** в `.git/branch-guard.log` (локальный, не уходит в репо,
+    добавлен в `.gitignore` на уровне `.git/`): каждая блокировка пишет
+    строку вида
+    `<ISO-8601 timestamp> [pre-push] action=BLOCKED_PUSH|BLOCKED_DELETE ref=<ref> user=<git user.email>`.
+    Это даёт пост-фактум видимость: «кто-когда упёрся в защиту main».
+  - **Stderr вместо stdout** для всех сообщений об ошибках и подсказок
+    (правильное поведение hook'а: ошибки и diagnostic — в stderr, чтобы
+    можно было pipe-ить stdout без шума).
+  - **`set -euo pipefail`** вместо `set -u` — fail-fast на любых сбоях
+    подкоманд (`git rev-parse`, `git config`). Внутренние `|| echo unknown`
+    в `log_audit` страхуют узкое место с user.email.
+  - **Документация edge-cases в шапке файла**: явный список 6 покрытых
+    сценариев (прямой push, refspec `feature:main`, `--delete`, `--force`,
+    `--all`/matching, detached HEAD) и 2 непокрытых by design
+    (`--no-verify`, push тегов с именем `main`).
+- **Rationale:** до этого PR хук работал, но имел три слепых места —
+  (1) жёстко зашитый `main`, (2) ноль аудита (нельзя понять, кто-когда
+  пытался запушить в main, отчёты по `--no-verify` собирать нечем),
+  (3) сообщения шли в stdout, что мешало бы любому wrapper-скрипту над
+  `git push`. Все три закрыты, обратной совместимости с прежним поведением
+  никаких изменений (env var опциональна, дефолт прежний).
+- **Smoke-tested локально на трёх сценариях:**
+  попытка удалить `main` → BLOCKED_DELETE (exit 1, audit log записан);
+  push в `main` через refspec → BLOCKED_PUSH (exit 1, audit log записан);
+  push в feature-ветку → пропуск (exit 0, audit log пуст).
+
+### Changed — AI onboarding refresh
+
+- **`docs/AI_ONBOARDING.md`**: секция «Локальные quality-gates» переписана —
+  теперь явно перечисляет env var конфиг, audit log и 6 edge-cases для
+  pre-push. Таблица безопасности обновлена: строка «Pre-push защита main»
+  отражает audit log; строка «Dependabot» — новый лимит 10 PR/неделя.
+- **Когда обновлять `AI_ONBOARDING.md`:** при любом изменении состава
+  hooks, CI jobs, hardening-метрик или roadmap. Сам файл — навигация,
+  источник правды по бизнес-логике остаётся `SPEC.md`.
+
+### Changed — Dependabot capacity
+
+- **`.github/dependabot.yml`**: `open-pull-requests-limit` поднят с 5 до 10
+  для группы pip. Контекст: в последние две недели Dependabot копит PR
+  быстрее, чем мы их мерджим (рост из-за CI hardening — теперь каждый
+  major-bump блокируется до прохождения 4 джобов). Лимит 5 приводил к
+  тому, что часть обновлений безопасности «теряется» (Dependabot их не
+  открывает, потому что квота забита Pythonic-обновлениями). Лимит 10
+  даёт запас на 1.5–2 недели без потерь.
+
+### Fixed — Systemd unit metadata
+
+- **`systemd/smoktolk-bot.service`**: в комментарии шапки заменён
+  плейсхолдер `PR #??` на актуальный `PR #61` (feat/ops-harden-bot-service).
+  Это косметика, на runtime-поведение не влияет, но история коммитов
+  теперь самодостаточна без обращения к git log.
+
+### Operational note
+
+После `git pull` обновления pre-push на всех машинах разработчиков
+**обязателен повторный `./scripts/setup-hooks.sh`** — хуки копируются
+через `cp` (см. SPEC §21.8), и старая версия в `.git/hooks/pre-push`
+останется без переустановки. Проверка актуальности:
+
+    diff scripts/git-hooks/pre-push .git/hooks/pre-push
+
+Пустой вывод = версии совпадают.
+
+---
+
+
 ### Added — Pre-commit branch guard (PR chore/hook-block-commit-to-main)
 - **`scripts/git-hooks/pre-commit`**: добавлен блок «branch guard» в самом
   начале хука. Сравнивает текущую ветку (`git symbolic-ref --short HEAD`) со
