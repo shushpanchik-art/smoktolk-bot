@@ -8,6 +8,7 @@
 **Сервис:** `smoktolk-bot.service` (systemd, enabled, user `smoktolk`)
 **Логи:** `/opt/smoktolk/bot/logs/bot.log` + `journalctl -u smoktolk-bot`
 **Бэкапы:** cron от `smoktolk` → `/var/backups/smoktolk/` (см. §15 и `docs/BACKUP.md`)
+**Операции:** деплой/health/откаты — `docs/OPERATIONS.md` (см. §17)
 **GitHub:** https://github.com/shushpanchik-art/smoktolk-bot (private)
 
 ---
@@ -419,9 +420,19 @@ scripts/git-hooks/pre-push
 .github/dependabot.yml
 .env.example, .gitignore, requirements.txt
 SPEC.md, README.md
+docs/{SECURITY,BACKUP,OPERATIONS}.md
+CONTRIBUTING.md, CHANGELOG.md
+systemd/smoktolk-bot.service
+systemd/smoktolk-bot.service.d/{10-alerts,20-resources}.conf
+scripts/deploy_systemd.sh
 ```
 
 ## 17. Запуск / диагностика
+
+> **Канонический операционный документ:** [`docs/OPERATIONS.md`](docs/OPERATIONS.md) —
+> деплой systemd-юнитов (`scripts/deploy_systemd.sh`), health checks,
+> security score, OOM-приоритет, карта артефактов на диске.
+> Этот раздел SPEC оставлен для быстрых однострочников.
 
 - Основной лог приложения: `/opt/smoktolk/bot/logs/bot.log` (RotatingFileHandler, см. `bot.py:setup_logging()`)
 - Свежие записи логгера бота: `tail -f /opt/smoktolk/bot/logs/bot.log`

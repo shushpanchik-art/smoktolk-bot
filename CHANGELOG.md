@@ -8,6 +8,66 @@
 
 ## [Unreleased]
 
+### Added — Operations runbook + SECURITY §4 hardening (PR docs/ops-hardening-and-deploy)
+- **`docs/OPERATIONS.md`** (новый, 134 строки): операционный runbook,
+  закрывает пробел между `BACKUP.md` (бэкапы БД) и `SECURITY.md` (политики).
+  Разделы: §1 деплой systemd-юнитов (source of truth, `deploy_systemd.sh`,
+  откаты), §2 health checks (is-active, ss/webhook, journalctl-фильтр на
+  EPERM/denied, `systemd-analyze security`, OOM-приоритет), §3 карта
+  артефактов на диске (код, venv, БД, логи, бэкапы L1/L2/L3).
+- **`docs/SECURITY.md` §4 «Runtime hardening (systemd)»**: метрика
+  9.2 UNSAFE → 1.3 OK, разбор по фазам (FS isolation, kernel/namespaces,
+  syscall filtering), почему `MemoryDenyWriteExecute=yes` НЕ включён
+  (ломает C-расширения Pillow/openpyxl/aiosqlite — вернёмся когда в CI
+  будет smoke-test полного цикла), регламент проверки и отката.
+- **`SPEC.md`**: три точечных правки —
+  (1) шапка: строка про `docs/OPERATIONS.md` рядом с `BACKUP.md`;
+  (2) §16 «Файлы проекта»: добавлены `docs/{SECURITY,BACKUP,OPERATIONS}.md`,
+  `CONTRIBUTING.md`, `CHANGELOG.md`, юниты systemd и `deploy_systemd.sh`,
+  которых раньше в списке не было;
+  (3) §17 «Запуск / диагностика»: врезка-указатель на канонический
+  `docs/OPERATIONS.md`, секция оставлена для быстрых однострочников.
+- **Rationale документации:** PR #61 задеплоил инфраструктуру (юнит,
+  drop-ins, скрипт), но операционная сторона жила в голове. Этот PR
+  фиксирует «как этим пользоваться» письменно, чтобы deploy/откат/health
+  можно было выполнить по runbook без AI-ассистента.
+
+### Added — systemd hardening для smoktolk-bot.service (PR #61, feat/ops-harden-bot-service)
+- **`systemd/smoktolk-bot.service`** (новый, мастер-копия): полный юнит
+  основного процесса бота с 3-фазным runtime hardening.
+  Score `systemd-analyze security`: **9.2 UNSAFE → 1.3 OK**.
+  - Phase 1 (FS isolation): `NoNewPrivileges`, `PrivateTmp`,
+    `ProtectSystem=strict`, `ProtectHome=yes`, `ReadWritePaths=` только
+    `data/` и `logs/`, `UMask=0027`.
+  - Phase 2 (kernel/namespaces): `ProtectKernel{Tunables,Modules,Logs}`,
+    `ProtectControlGroups`, `ProtectClock`, `ProtectHostname`,
+    `ProtectProc=invisible`, `RestrictNamespaces`, `RestrictSUIDSGID`,
+    `RestrictRealtime`, `LockPersonality`, `PrivateDevices`,
+    `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6`,
+    `CapabilityBoundingSet=` (пусто), `AmbientCapabilities=` (пусто).
+  - Phase 3 (syscall filter): `SystemCallFilter=@system-service` +
+    deny `@privileged @resources @debug @cpu-emulation @obsolete`,
+    `SystemCallErrorNumber=EPERM` (errno вместо SIGSYS для лучшей
+    диагностики и graceful degradation), `SystemCallArchitectures=native`.
+- **`systemd/smoktolk-bot.service.d/20-resources.conf`** (новый):
+  drop-in лимитов ресурсов — `MemoryHigh=400M`, `MemoryMax=512M`
+  (текущий baseline RSS ≈ 280M, потолок с 80% запасом), `TasksMax=50`,
+  `OOMScoreAdjust=-500` (бот выживает раньше других процессов при OOM).
+- **`scripts/deploy_systemd.sh`** (новый, 163 строки, exec): идемпотентный
+  деплой unit-файлов из репо в `/etc/systemd/system/`. Возможности:
+  `--dry-run` (показывает `diff -u`), timestamped-бэкапы в
+  `/var/backups/smoktolk-systemd/YYYYMMDD-HHMMSS/`, `--restart <unit>` с
+  автоматическим rollback при `is-active=failed` через 3 сек, печать
+  команды ручного отката. Запускается под `root` (sudo).
+- **Верификация на проде** (после деплоя):
+  `systemctl is-active smoktolk-bot.service` → active, RSS стабильный
+  280M, webhook на `127.0.0.1:8080` слушает, polling зелёный, в журнале
+  нет EPERM/seccomp denied, security score 1.3 OK.
+- **Что НЕ включено** (с обоснованием):
+  - `MemoryDenyWriteExecute=yes` — ломает Pillow/openpyxl/aiosqlite
+    (мапят W+X страницы для C-расширений). Вернёмся когда в CI появится
+    smoke-test полного цикла (загрузка xlsx-каталога, работа с БД).
+
 ### Added — Coverage report: pytest-cov + badge (PR chore/pytest-cov-and-badge)
 - **`.coveragerc`**: конфигурация coverage.py. `branch = True` для точности
   (учитывает оба ветвления if/else). Исключает `venv/`, `tests/`,
