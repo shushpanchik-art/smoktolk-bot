@@ -9,6 +9,7 @@
 **Логи:** `/opt/smoktolk/bot/logs/bot.log` + `journalctl -u smoktolk-bot`
 **Бэкапы:** cron от `smoktolk` → `/var/backups/smoktolk/` (см. §15 и `docs/BACKUP.md`)
 **Операции:** деплой/health/откаты — `docs/OPERATIONS.md` (см. §17)
+**AI onboarding:** вводная для нового AI-ассистента — `docs/AI_ONBOARDING.md`
 **GitHub:** https://github.com/shushpanchik-art/smoktolk-bot (private)
 
 ---

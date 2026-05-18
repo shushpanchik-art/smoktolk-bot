@@ -8,6 +8,30 @@
 
 ## [Unreleased]
 
+### Added — AI onboarding guide (PR docs/ai-onboarding-guide)
+- **`docs/AI_ONBOARDING.md`** (новый, ~170 строк): единый «вводный пакет»
+  для нового AI-ассистента, открывающего проект с нуля. Содержит:
+  стек и архитектуру (Python 3.11/aiogram/aiohttp/SQLite, монолит, systemd),
+  бизнес-логику (10 баллов = 1 ₽, TTL 120д, уровни, категории — со ссылками
+  на `SPEC.md` §5–9), карту структуры репозитория, статус деплоя
+  (`systemd-analyze security` = 1.3 OK), CI/CD jobs и coverage baseline
+  (11.36%, 103 теста), инвентарь безопасности с явной фиксацией accepted
+  risks (Branch Protection, signed commits, MemoryDenyWriteExecute),
+  конвенции (Conventional Commits, PR-only workflow), правила
+  взаимодействия с AI (SPEC §0, §24 — heredoc-инциденты §23.4–23.8),
+  roadmap (SPEC §20) и стартовый набор команд для первого сообщения.
+- **`SPEC.md`**: в шапку добавлена строка-указатель на
+  `docs/AI_ONBOARDING.md` сразу после ссылки на `docs/OPERATIONS.md`.
+- **Rationale:** до этого PR при смене контекста (новый чат с ИИ,
+  возвращение к проекту через паузу, передача коллеге) приходилось
+  собирать вводную вручную из `SPEC.md`, `README.md`, `docs/SECURITY.md`,
+  `CHANGELOG.md`, `systemctl status` и истории git. `AI_ONBOARDING.md`
+  даёт за одно чтение полную карту: где источник правды, что уже
+  закрыто, что отложено и почему, какой первый шаг сделать.
+- **Когда обновлять:** при значимом изменении стека, ветки `main` HEAD,
+  hardening-статуса, coverage baseline или roadmap. Источник правды по
+  бизнес-логике остаётся `SPEC.md`; AI_ONBOARDING — навигационная карта.
+
 ### Added — Operations runbook + SECURITY §4 hardening (PR docs/ops-hardening-and-deploy)
 - **`docs/OPERATIONS.md`** (новый, 134 строки): операционный runbook,
   закрывает пробел между `BACKUP.md` (бэкапы БД) и `SECURITY.md` (политики).
