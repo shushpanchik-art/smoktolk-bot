@@ -198,17 +198,21 @@ source venv/bin/activate && pytest --cov --cov-config=.coveragerc 2>&1 | tail -5
 
 1. **Squash-merge ложно-отрицательный детект.**
    После squash-merge `git merge-base --is-ancestor origin/<branch> origin/main` возвращает `not-merged`, и `git diff origin/main...origin/<branch> --shortstat` показывает «фантомный» diff (за счёт коммитов, прилетевших в main после ответвления).
-   **Правильная проверка:** `gh pr list --state merged --search "head:<branch>"` или поиск squash-коммита в main по subject ветки:
-git log origin/main --oneline --grep="$(git log origin/<branch> -1 --format=%s | cut -d: -f1)"
+
+   **Правильная проверка:** `gh pr list --state merged --search "head:<branch>"` или поиск squash-коммита в main по subject ветки (4-space indent — markdown trick для отображения кода внутри списка, без вложенных fence):
+
+       git log origin/main --oneline --grep="$(git log origin/<branch> -1 --format=%s | cut -d: -f1)"
 
 2. **`gh pr merge` для Dependabot-PR-ов на `.github/workflows/*`** падает с `refusing to allow an OAuth App to create or update workflow without workflow scope`.
-**Фикс:** `gh auth refresh -h github.com -s workflow` (CLI с расширенным scope) **или** мердж через web UI.
+
+   **Фикс:** `gh auth refresh -h github.com -s workflow` (CLI с расширенным scope) **или** мердж через web UI.
 
 3. **Dependabot оставляет старый комментарий рядом с новым SHA.**
-Пример: PR #67 поднял `upload-artifact` с 4.6.0 до 7.0.1, но в diff комментарий остался `# v4`. SHA обновлён корректно — версия реально v7.0.1, просто комментарий ошибочен.
-**Правило:** не доверять комментарию рядом с SHA, верифицировать через `gh pr view <N> --json title` или GitHub release page.
+   Пример: PR #67 поднял `upload-artifact` с 4.6.0 до 7.0.1, но в diff комментарий остался `# v4`. SHA обновлён корректно — версия реально v7.0.1, просто комментарий ошибочен.
 
-4. **Heredoc-инциденты при работе с AI-ассистентом** (SPEC §23.4–23.8): markdown-документы создавать через python-скрипт `Path.write_text(...)` либо отдельным редактором, **не** через `cat <<EOF`.
+   **Правило:** не доверять комментарию рядом с SHA, верифицировать через `gh pr view <N> --json title` или GitHub release page.
+
+4. **Heredoc-инциденты при работе с AI-ассистентом** (SPEC §23.4–23.8): markdown-документы создавать через python-скрипт `Path.write_text(...)` либо отдельным редактором, **не** через `cat <<EOF`. При формировании markdown-блока внутри python-строки избегать вложенных тройных бэктиков — использовать 4-space indent для inline-кода в списках.
 
 ### Что критично хранить между сессиями
 
@@ -216,4 +220,3 @@ git log origin/main --oneline --grep="$(git log origin/<branch> -1 --format=%s |
 - Список открытых PR + есть ли среди них Dependabot.
 - `systemd-analyze security smoktolk-bot.service` (должен оставаться **1.3 OK**).
 - Версии CI actions — потому что Dependabot шлёт авто-PR и нужно их пропускать.
-
