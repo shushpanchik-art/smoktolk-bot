@@ -8,6 +8,10 @@
 
 ## [Unreleased]
 
+### Changed
+- `docs/AI_ONBOARDING.md`: добавлен раздел «Update log / Снимок на 2025-11-13» с актуальным HEAD `main`, версиями pinned-actions (checkout v6.0.2, setup-python v6.2.0, upload-artifact v7.0.1), runbook-ловушками (squash-merge false-negative детект, `gh auth refresh -s workflow` для workflow-PR Dependabot-а, mismatch комментария-vs-SHA после автобампов).
+- `.github/workflows/ci.yml`: исправлен ошибочный комментарий `# v4` рядом с `actions/upload-artifact@043fb46d…` на `# v7.0.1` (PR #67 реально поднял до 7.0.1, Dependabot забыл обновить inline-комментарий).
+
 ### Added — Pre-push hardening + onboarding refresh (PR chore/harden-pre-push-and-refresh-onboarding)
 
 - **`scripts/git-hooks/pre-push`** — расширен и упрочнён:
