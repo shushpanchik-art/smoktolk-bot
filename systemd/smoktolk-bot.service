@@ -11,7 +11,7 @@
 # baseline 9.2 UNSAFE → после этого файла ~2.x OK.
 #
 # История:
-#   PR #?? (feat/ops-harden-bot-service) — добавлен runtime hardening
+#   PR #61 (feat/ops-harden-bot-service) — добавлен runtime hardening
 #   до этого: только User=smoktolk, без NoNewPrivileges/ProtectSystem/Restrict*
 
 [Unit]
