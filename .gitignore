@@ -45,3 +45,10 @@ data/avatr*
 
 # Animated bot avatar (source of truth, see docs/ANIMATED_AVATAR_RECIPE.md)
 !data/avatr2_botpic.mp4
+
+# одноразовые патч-скрипты и рабочие бэкапы (не коммитим)
+_patch_*.py
+*.bak2
+*.rowsbak
+*.step4bak
+*.widthbak

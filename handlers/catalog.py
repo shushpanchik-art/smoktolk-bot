@@ -1,29 +1,29 @@
-"""Просмотр ассортимента из Excel: категории → товары → карточка."""
+"""Просмотр ассортимента: категории - производители - товары - карточка."""
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
-
 import catalog
 import keyboards as kb
+import catalog_norm
 from utils import esc
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 router = Router()
-PAGE_SIZE = 8
+
+
+def _sorted_makers(products):
+    s = {(p.get("manufacturer") or "Прочее").strip() or "Прочее" for p in products}
+    return sorted(s, key=lambda x: x.lower())
 
 
 @router.callback_query(F.data == "catalog_main")
 async def catalog_main(cb: CallbackQuery):
     products = await catalog.get_products()
     if not products:
-        await cb.message.edit_text("🛍 Ассортимент пока не загружен.",
-                                   reply_markup=kb.kb_back_main())
+        await cb.message.edit_text("Ассортимент пока не загружен.", reply_markup=kb.kb_back_main())
         await cb.answer()
         return
     cats = sorted({p["category"] for p in products})
-    text = (
-        "🛍 <b>Ассортимент</b>\n\n"
-        "Цены и наличие — для информации. Покупка только в магазине.\n\n"
-        "Выберите категорию:"
-    )
+    text = "<b>Ассортимент</b>\n\nЦены и наличие - для информации.\n\nВыберите категорию:"
     await cb.message.edit_text(text, reply_markup=kb.kb_catalog_categories(cats))
     await cb.answer()
 
@@ -31,52 +31,96 @@ async def catalog_main(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("cat_cat:"))
 async def cat_category(cb: CallbackQuery):
     cat = cb.data.split(":", 1)[1]
-    await _show_page(cb, cat, 0)
-
-
-@router.callback_query(F.data.startswith("cat_page:"))
-async def cat_page(cb: CallbackQuery):
-    _, cat, page = cb.data.split(":")
-    await _show_page(cb, cat, int(page))
-
-
-async def _show_page(cb: CallbackQuery, cat: str, page: int):
-    products = sorted(
-        [p for p in await catalog.get_products() if p["category"] == cat],
-        key=lambda x: x["name"].lower(),
-    )
+    products = [p for p in await catalog.get_products() if p["category"] == cat]
     if not products:
         await cb.answer("В этой категории пусто", show_alert=True)
         return
-    total_pages = max(1, (len(products) + PAGE_SIZE - 1) // PAGE_SIZE)
+    makers = _sorted_makers(products)
+    title = catalog_norm.category_title(cat)
+    text = f"<b>{esc(title)}</b>\n\nВыберите производителя:"
+    await cb.message.edit_text(text, reply_markup=kb.kb_catalog_makers(makers, cat))
+    await cb.answer()
+
+
+MAKER_PER_PAGE = 7
+
+
+async def _show_maker(cb, cat, idx, page):
+    all_in_cat = [p for p in await catalog.get_products() if p["category"] == cat]
+    makers = _sorted_makers(all_in_cat)
+    if idx < 0 or idx >= len(makers):
+        await cb.answer("Производитель не найден", show_alert=True)
+        return
+    maker = makers[idx]
+    products = sorted(
+        [p for p in all_in_cat if ((p.get("manufacturer") or "Прочее").strip() or "Прочее") == maker],
+        key=lambda x: x["name"].lower(),
+    )
+    total_pages = max(1, (len(products) + MAKER_PER_PAGE - 1) // MAKER_PER_PAGE)
     page = max(0, min(page, total_pages - 1))
-    chunk = products[page * PAGE_SIZE:(page + 1) * PAGE_SIZE]
-    text = f"<b>{esc(cat.capitalize())}</b> — {len(products)} товаров"
+    chunk = products[page * MAKER_PER_PAGE:(page + 1) * MAKER_PER_PAGE]
+    title = catalog_norm.category_title(cat)
+    text = f"<b>{esc(maker)}</b>\n<i>{esc(title)}</i>\n\nВыберите товар:"
     await cb.message.edit_text(
-        text, reply_markup=kb.kb_catalog_products(chunk, cat, page, total_pages)
+        text,
+        reply_markup=kb.kb_maker_products(chunk, cat, idx, page, total_pages),
     )
     await cb.answer()
+
+
+@router.callback_query(F.data.startswith("cat_mk:"))
+async def cat_maker(cb: CallbackQuery):
+    _, cat, idx = cb.data.split(":")
+    await _show_maker(cb, cat, int(idx), 0)
+
+
+@router.callback_query(F.data.startswith("cat_mkp:"))
+async def cat_maker_page(cb: CallbackQuery):
+    _, cat, idx, page = cb.data.split(":")
+    await _show_maker(cb, cat, int(idx), int(page))
 
 
 @router.callback_query(F.data.startswith("cat_prod:"))
 async def cat_product(cb: CallbackQuery):
-    sku = cb.data.split(":", 1)[1]
+    parts = cb.data.split(":")
+    sku = parts[1]
+    bk_idx = int(parts[3]) if len(parts) > 3 else None
+    bk_page = int(parts[4]) if len(parts) > 4 else None
     p = await catalog.get_product(sku)
     if not p:
         await cb.answer("Товар не найден", show_alert=True)
         return
-    text = (
-        f"<b>{esc(p['name'])}</b>\n\n"
-        f"Категория: {esc(p['category'])}\n"
-        f"Цена: <b>{p['price']} ₽</b>\n"
-        f"Наличие: {esc(p.get('stock', 'уточняйте'))}\n\n"
-        f"{esc(p.get('description', ''))}"
-        f"\n\n<i>Покупка только в магазине после проверки документа (для 18+ категорий).</i>"
-    )
-    await cb.message.edit_text(text, reply_markup=kb.kb_product_back(p["category"]))
+    cat = p["category"]
+    maker = (p.get("manufacturer") or "Прочее").strip() or "Прочее"
+    lines = [f"<b>{esc(p['name'])}</b>", ""]
+    lines.append(f"Производитель: {esc(maker)}")
+    if p.get("price"):
+        lines.append(f"Цена: {esc(str(p['price']))} ₽")
+    st = p.get("stock")
+    try:
+        st_val = float(st)
+    except (TypeError, ValueError):
+        st_val = None
+    if st_val is not None and st_val > 0:
+        lines.append("✅ В наличии")
+    else:
+        lines.append("⏳ Ожидается поступление")
+    if p.get("description"):
+        lines += ["", esc(str(p["description"]))]
+    text = "\n".join(lines)
+    await cb.message.edit_text(text, reply_markup=kb.kb_product_card(cat, bk_idx, bk_page))
     await cb.answer()
 
 
+@router.callback_query(F.data == "catalog_consult")
+async def catalog_consult(cb: CallbackQuery):
+    from config import SUPPORT_TEXT
+    b = InlineKeyboardBuilder()
+    b.button(text="« В каталог", callback_data="catalog_main")
+    b.adjust(1)
+    await cb.message.edit_text(SUPPORT_TEXT, reply_markup=b.as_markup())
+    await cb.answer()
+
 @router.callback_query(F.data == "noop")
-async def noop(cb: CallbackQuery):
+async def cat_noop(cb: CallbackQuery):
     await cb.answer()
