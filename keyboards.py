@@ -1,4 +1,5 @@
 """Все inline-клавиатуры. callback_data — осмысленные, без слешей."""
+import catalog_norm
 from aiogram.types import (InlineKeyboardMarkup,
                            ReplyKeyboardMarkup, KeyboardButton)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -94,19 +95,15 @@ def kb_gift_confirm(code: str) -> InlineKeyboardMarkup:
 
 def kb_catalog_categories(categories: list[str]) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
-    titles = {
-        "liquid": "💧 Жидкости", "device": "🎶 Устройства",
-        "accessories": "🎒 Аксессуары", "tools": "🔧 Инструменты",
-        "cables": "🔌 Кабели", "sweets": "🍬 Снеки",
-        "pods": "💨 Поды", "disposable": "🎵 Одноразки", "tobacco": "🌿 Табак",
-        # русские ключи из парсера прайса:
-        "устройства": "🎶 Устройства", "одноразки": "🎵 Одноразки",
-        "расходники": "🔋 Расходники", "разное": "🎒 Разное",
-    }
-    for c in categories:
-        b.button(text=titles.get(c, c), callback_data=f"cat_cat:{c}")
+    rows = catalog_norm.category_rows(set(categories))
+    counts = []
+    for row in rows:
+        for c in row:
+            b.button(text=catalog_norm.category_title(c), callback_data=f"cat_cat:{c}")
+        counts.append(len(row))
     b.button(text="« Назад", callback_data="back_main")
-    b.adjust(2)
+    counts.append(1)
+    b.adjust(*counts)
     return b.as_markup()
 
 
@@ -206,4 +203,51 @@ def kb_broadcast_confirm() -> InlineKeyboardMarkup:
     b.button(text="✅ Разослать всем", callback_data="adm_bc_go")
     b.button(text="« Отмена", callback_data="admin_main")
     b.adjust(1)
+    return b.as_markup()
+
+
+def kb_catalog_makers(makers, category):
+    b = InlineKeyboardBuilder()
+    for i, m in enumerate(makers):
+        b.button(text=m, callback_data=f"cat_mk:{category}:{i}")
+    b.button(text="« К категориям", callback_data="catalog_main")
+    rows = [2] * (len(makers) // 2)
+    if len(makers) % 2:
+        rows.append(1)
+    rows += [1]
+    b.adjust(*rows)
+    return b.as_markup()
+
+
+def kb_maker_products(products, category, maker_idx=0, page=0, total_pages=1):
+    b = InlineKeyboardBuilder()
+    for p in products:
+        b.button(text=p["name"], callback_data=f"cat_prod:{p['sku']}:{category}:{maker_idx}:{page}")
+    nav = []
+    if page > 0:
+        nav.append(("« Стр.", f"cat_mkp:{category}:{maker_idx}:{page-1}"))
+    if total_pages > 1:
+        nav.append((f"{page+1}/{total_pages}", "noop"))
+    if page < total_pages - 1:
+        nav.append(("Стр. »", f"cat_mkp:{category}:{maker_idx}:{page+1}"))
+    for text, cd in nav:
+        b.button(text=text, callback_data=cd)
+    b.button(text="« К производителям", callback_data=f"cat_cat:{category}")
+    rows = [1] * len(products)
+    if nav:
+        rows.append(len(nav))
+    rows.append(1)
+    b.adjust(*rows)
+    return b.as_markup()
+
+
+def kb_product_card(category, maker_idx=None, page=None):
+    b = InlineKeyboardBuilder()
+    b.button(text="☎️ Получить консультацию", callback_data="catalog_consult")
+    if maker_idx is not None and page is not None:
+        back = f"cat_mkp:{category}:{maker_idx}:{page}"
+    else:
+        back = f"cat_cat:{category}"
+    b.button(text="« К товарам", callback_data=back)
+    b.adjust(1, 1)
     return b.as_markup()

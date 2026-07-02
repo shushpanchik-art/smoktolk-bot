@@ -14,6 +14,7 @@ import aiohttp
 import openpyxl
 
 import config
+import catalog_norm
 
 log = logging.getLogger(__name__)
 
@@ -146,15 +147,8 @@ def _load_workbook_safe(path: str):
 
 
 def _detect_category(name: str) -> str:
-    """Определить категорию товара по названию."""
-    n = name.lower()
-    if n.startswith("набор"):
-        return "устройства"
-    if n.startswith("одноразов"):
-        return "одноразки"
-    if n.startswith(("картридж", "испаритель")):
-        return "расходники"
-    return "разное"
+    """Определить категорию товара по названию (fallback)."""
+    return catalog_norm.normalize_category(name)
 
 
 def _find_header_row(rows: list) -> tuple[int, dict[str, int]]:
@@ -168,6 +162,10 @@ def _find_header_row(rows: list) -> tuple[int, dict[str, int]]:
         "price": ("цена продажи",),
         "stock": ("количество",),
         "rec": ("рекомендация",),
+        "category": ("тип",),
+        "desc": ("описание",),
+        "country": ("страна",),
+        "marking": ("акциз", "маркировка"),
     }
     for row_idx, row in enumerate(rows):
         if not row:
@@ -197,7 +195,10 @@ def _parse_xlsx(path: str) -> list[dict[str, Any]]:
       • в конце файла служебные строки 'Средняя', 'Итого:', 'Менеджер'
     """
     wb = _load_workbook_safe(path)
-    ws = wb.active
+    if "Ассортимент" in wb.sheetnames:
+        ws = wb["Ассортимент"]
+    else:
+        ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
         log.warning("Catalog: empty sheet")
@@ -218,6 +219,10 @@ def _parse_xlsx(path: str) -> list[dict[str, Any]]:
     price_col = col_map["price"]
     stock_col = col_map.get("stock")
     rec_col = col_map.get("rec")
+    cat_col = col_map.get("category")
+    desc_col = col_map.get("desc")
+    country_col = col_map.get("country")
+    marking_col = col_map.get("marking")
 
     result: list[dict[str, Any]] = []
     skipped_no_num = 0
@@ -263,16 +268,35 @@ def _parse_xlsx(path: str) -> list[dict[str, Any]]:
         else:
             stock = "уточняйте"
 
-        # Description ← рекомендация
-        rec_val = row[rec_col] if rec_col is not None and rec_col < len(row) else None
-        description = rec_val.strip() if isinstance(rec_val, str) else ""
+        # Description ← колонка "Описание" (иначе "Рекомендация")
+        def _cell(idx):
+            return row[idx] if idx is not None and idx < len(row) else None
+        desc_val = _cell(desc_col)
+        rec_val = _cell(rec_col)
+        base = desc_val if isinstance(desc_val, str) and desc_val.strip() else rec_val
+        description = base.strip() if isinstance(base, str) else ""
+        country_val = _cell(country_col)
+        if isinstance(country_val, str) and country_val.strip():
+            description += f"\nСтрана: {country_val.strip()}"
+        marking_val = _cell(marking_col)
+        marking = marking_val.strip() if isinstance(marking_val, str) else ""
 
+        raw_cat = (
+            row[cat_col].strip()
+            if cat_col is not None and cat_col < len(row)
+            and isinstance(row[cat_col], str) and row[cat_col].strip()
+            else ""
+        )
+        cat_key = catalog_norm.normalize_category(raw_cat) if raw_cat else _detect_category(name)
         item = {
             "sku": f"SKU-{num:04d}",
-            "name": name,
-            "category": _detect_category(name),
+            "name": catalog_norm.clean_name(name),
+            "raw_name": name,
+            "category": cat_key,
+            "manufacturer": catalog_norm.extract_manufacturer(catalog_norm.clean_name(name)),
             "price": price,
             "stock": stock,
+            "marking": marking,
             "description": description,
         }
         result.append(item)
