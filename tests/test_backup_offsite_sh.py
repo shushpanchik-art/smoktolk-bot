@@ -23,7 +23,6 @@
 import stat
 import subprocess
 import textwrap
-import time
 from pathlib import Path
 
 import pytest
@@ -373,28 +372,16 @@ def test_10_concurrent_lock(env_setup):
     _make_rclone_stub(env_setup["bin_dir"])
     _make_notify_stub(env_setup["bin_dir"])
 
+    import fcntl
     lock_path = env_setup["staging_dir"] / ".offsite.lock"
-    # Держим flock в фоне, пока спим.
-    holder = subprocess.Popen(
-        ["flock", "-n", str(lock_path), "-c", "sleep 10"],
-    )
+    # Держим flock прямо из питона (надёжно, не зависит от shell пользователя).
+    lock_fd = open(str(lock_path), "w")
+    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     try:
-        # Подождём, пока flock реально захватит файл.
-        for _ in range(40):
-            if lock_path.exists():
-                break
-            time.sleep(0.05)
-        # Дать flock-у немного времени реально взять lock (не только создать файл).
-        time.sleep(0.2)
-
         proc = _run_script(env_setup, expect_rc=0)
         assert "предыдущий запуск offsite ещё работает" in proc.stdout
         assert _rclone_calls(env_setup) == []
         assert _notify_events(env_setup) == []
     finally:
-        holder.terminate()
-        try:
-            holder.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            holder.kill()
-            holder.wait()
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        lock_fd.close()
