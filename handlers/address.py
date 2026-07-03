@@ -4,7 +4,7 @@ from aiogram.types import (
     CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 )
 
-from config import STORE_INFO_TEXT, STORE_MAP_URL
+from config import STORE_INFO_TEXT, STORE_MAP_URL, STORE_MAP2_URL
 
 router = Router(name="address")
 
@@ -18,10 +18,12 @@ def _kb_address(from_disclaimer: bool) -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(text="🗺 Открыть в Яндекс.Картах", url=STORE_MAP_URL)],
     ]
+    if STORE_MAP2_URL:
+        rows.append([InlineKeyboardButton(text="🧭 Открыть в 2ГИС", url=STORE_MAP2_URL)])
     if from_disclaimer:
         rows.append([InlineKeyboardButton(text="« Назад", callback_data="back_to_rules")])
     else:
-        rows.append([InlineKeyboardButton(text="« Назад", callback_data="back_main")])
+        rows.append([InlineKeyboardButton(text="« В главное меню", callback_data="back_main")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
