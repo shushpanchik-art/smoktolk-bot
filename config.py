@@ -113,9 +113,11 @@ SUPPORT_TEXT = (
 # ─────────────────────────────────────────────────────────
 STORE_CITY    = os.getenv("STORE_CITY",    "Москва")
 STORE_ADDRESS = os.getenv("STORE_ADDRESS", "Волгоградский проспект, 10с2")
-STORE_HOURS   = os.getenv("STORE_HOURS",   "Ежедневно, 8:00 – 23:00")
-STORE_MAP_URL = os.getenv("STORE_MAP_URL", "https://yandex.com/maps/-/CPgJENnt")
+STORE_HOURS   = os.getenv("STORE_HOURS",   "Ежедневно, 10:00 – 20:00")
+STORE_MAP_URL = os.getenv("STORE_MAP_URL", "https://yandex.ru/maps/-/CTeGnA~t")
+STORE_MAP2_URL = os.getenv("STORE_MAP2_URL", "https://2gis.ru/moscow/firm/70000001114729110")  # ссылка 2GIS; пусто = кнопка не показывается
 STORE_PHONE   = os.getenv("STORE_PHONE",   "")  # пусто = строка не показывается
+STORE_PARKING = os.getenv("STORE_PARKING", "есть, удобный заезд со стороны Волгоградского проспекта👌")  # пусто = не показывать
 
 def _build_store_info_text() -> str:
     lines = [
@@ -123,6 +125,10 @@ def _build_store_info_text() -> str:
         "",
         f"<b>Адрес:</b> г. {STORE_CITY}, {STORE_ADDRESS}",
         f"<b>Часы работы:</b> {STORE_HOURS}",
+    ]
+    if STORE_PARKING:
+        lines.append(f"\U0001F17F\uFE0F <b>Парковка:</b> {STORE_PARKING}")
+    lines += [
     ]
     if STORE_PHONE:
         lines.append(f"<b>Телефон:</b> {STORE_PHONE}")

@@ -1,7 +1,9 @@
 """Все inline-клавиатуры. callback_data — осмысленные, без слешей."""
 import catalog_norm
 from aiogram.types import (InlineKeyboardMarkup,
-                           ReplyKeyboardMarkup, KeyboardButton)
+                           ReplyKeyboardMarkup, KeyboardButton,
+    CopyTextButton,
+)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import LEVELS, BOT_USERNAME
@@ -188,13 +190,14 @@ def kb_admin_back() -> InlineKeyboardMarkup:
 
 def kb_admin_user_card(user_id: int) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
+    b.button(text=f"\U0001F4CB Скопировать ID: {user_id}", copy_text=CopyTextButton(text=str(user_id)))
     b.button(text="➕ Начислить", callback_data=f"adm_pts_add:{user_id}")
     b.button(text="➖ Списать", callback_data=f"adm_pts_sub:{user_id}")
     b.button(text="🎂 Изменить ДР", callback_data=f"adm_bday_set:{user_id}")
     b.button(text="🔞 Тогл возраст", callback_data=f"adm_age_toggle:{user_id}")
     b.button(text="📜 История", callback_data=f"adm_user_hist:{user_id}")
     b.button(text="« К поиску", callback_data="adm_users")
-    b.adjust(2, 1, 1, 1, 1)
+    b.adjust(1, 2, 1, 1, 1, 1)
     return b.as_markup()
 
 
