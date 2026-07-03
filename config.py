@@ -128,8 +128,6 @@ def _build_store_info_text() -> str:
     ]
     if STORE_PARKING:
         lines.append(f"\U0001F17F\uFE0F <b>Парковка:</b> {STORE_PARKING}")
-    lines += [
-    ]
     if STORE_PHONE:
         lines.append(f"<b>Телефон:</b> {STORE_PHONE}")
     lines += [
