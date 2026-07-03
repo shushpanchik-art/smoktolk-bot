@@ -154,20 +154,19 @@ def test_lock_prevents_parallel_run(env):
     """Захваченный lock-файл → второй процесс выходит с WARN."""
     cfg = {k: v for k, v in env.items() if not k.startswith("_")}
     env["_backup_dir"].mkdir(parents=True, exist_ok=True)
+    import fcntl
     lock_path = env["LOCK_FILE"]
-    # захватываем lock через flock на длительное время
-    holder = subprocess.Popen(
-        ["flock", "-x", str(lock_path), "sleep", "10"],
-    )
+    # захватываем lock прямо из питона — надёжно, не зависит от shell пользователя
+    lock_fd = open(str(lock_path), "w")
+    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     try:
-        time.sleep(0.3)  # дать flock время реально взять блокировку
         r = _run(cfg)
         assert "WARN" in r.stdout
         assert "lock" in r.stdout
         assert _backups(env["_backup_dir"]) == []
     finally:
-        holder.terminate()
-        holder.wait(timeout=5)
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        lock_fd.close()
 
 
 def test_missing_db_fails(env, tmp_path):
