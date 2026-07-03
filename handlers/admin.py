@@ -1,4 +1,5 @@
 """Админ-панель только для @utc2000."""
+import asyncio
 import logging
 from datetime import datetime
 from aiogram import Router, F, Bot
@@ -281,17 +282,22 @@ async def adm_refresh_catalog(cb: CallbackQuery):
     if not _is_admin(cb.from_user.id):
         await cb.answer()
         return
-    await cb.answer("Обновляю…")
+    await cb.answer()
     try:
+        await cb.message.edit_text("⏳ Загружаю прайс…")
         n_p = await catalog.refresh(force=True)
+        await cb.message.edit_text("🔄 Нормализую категории…")
+        await asyncio.sleep(0.4)
         gifts = await catalog.get_gifts()
         n_g = len(gifts)
-        await cb.message.answer(f"✅ Каталог обновлён.\nТоваров: {n_p}\nПодарков: {n_g}",
-                                reply_markup=kb.kb_admin_back())
+        await cb.message.edit_text(
+            f"✅ Готово: {n_p} товаров, {n_g} подарков.",
+            reply_markup=kb.kb_admin_back(),
+        )
     except Exception as e:
         log.exception("refresh: %s", e)
-        await cb.message.answer(f"❌ Ошибка: <code>{esc(str(e))}</code>",
-                                reply_markup=kb.kb_admin_back())
+        await cb.message.edit_text(f"❌ Ошибка: <code>{esc(str(e))}</code>",
+                                   reply_markup=kb.kb_admin_back())
 
 
 @router.callback_query(F.data == "adm_gifts")
