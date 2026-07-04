@@ -256,3 +256,55 @@ async def redeem_amount(msg: Message, state: FSMContext):
         ),
         reply_markup=kb.kb_back_main()
     )
+
+
+# ---------- Удаление / восстановление профиля ----------
+
+@router.callback_query(F.data == "profile_delete")
+async def profile_delete(cb: CallbackQuery):
+    text = (
+        "🗑 <b>Удаление профиля</b>\n\n"
+        "После удаления твой профиль скрывается, а через <b>30 дней</b> "
+        "баллы и уровень безвозвратно обнуляются.\n\n"
+        "До этого срока профиль можно <b>восстановить</b> в любой момент "
+        "с сохранением баллов.\n\n"
+        "Удалить профиль?"
+    )
+    await cb.message.edit_text(text, reply_markup=kb.kb_delete_confirm())
+    await cb.answer()
+
+
+@router.callback_query(F.data == "profile_delete_yes")
+async def profile_delete_yes(cb: CallbackQuery):
+    await db.soft_delete_profile(cb.from_user.id, by="user")
+    text = (
+        "✅ <b>Профиль удалён</b>\n\n"
+        "Баллы и уровень сохранятся ещё <b>30 дней</b>. "
+        "В течение этого срока ты можешь восстановить профиль."
+    )
+    await cb.message.edit_text(text, reply_markup=kb.kb_restore())
+    await cb.answer("Профиль удалён", show_alert=True)
+
+
+@router.callback_query(F.data == "profile_restore")
+async def profile_restore(cb: CallbackQuery):
+    await db.restore_profile(cb.from_user.id)
+    await cb.answer("♻️ Профиль восстановлен", show_alert=True)
+    # показываем профиль заново
+    user = await db.get_user(cb.from_user.id)
+    lvl = LEVELS[user["level"]]
+    text = (
+        f"👤 <b>Профиль</b>\n\n"
+        f"ID: <code>{user['user_id']}</code>\n"
+        f"Имя: {esc(user['full_name'] or '—')}\n"
+        f"Username: @{esc(user['username']) if user['username'] else '—'}\n"
+        f"Телефон: <code>{esc(user['phone'] or '—')}</code>\n"
+        f"День рождения: {fmt_date_iso(user['birthday'])}\n"
+        f"Возраст подтверждён: {'✅' if user['age_verified'] else '❌'}\n\n"
+        f"Уровень: <b>L{lvl.num} {esc(lvl.name)}</b> (кэшбэк {int(lvl.earn_rate*100)}%)\n"
+        f"Баллы: <b>{user['points']}</b>\n"
+        f"Всего начислено: {user['lifetime_points']}\n"
+        f"Покупок: {user['purchases_count']} (на {user['total_spent']} ₽)\n"
+        f"Уведомления: {'🔔 вкл' if user['notifications_enabled'] else '🔕 выкл'}\n"
+    )
+    await cb.message.edit_text(text, reply_markup=kb.kb_profile(bool(user["age_verified"])))

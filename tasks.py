@@ -69,3 +69,32 @@ async def birthday_loop(bot: Bot):
         except Exception as e:
             log.exception("birthday loop: %s", e)
             await asyncio.sleep(60)
+
+
+async def deletion_cleanup_loop(bot: Bot):
+    """Ежедневно 04:00 UTC: предупреждаем перед очисткой и чистим просроченные профили."""
+    while True:
+        try:
+            await _sleep_until(4, 0)
+            warn_ids = await db.warn_before_purge_candidates()
+            for uid in warn_ids:
+                try:
+                    await bot.send_message(
+                        uid,
+                        "\u26a0\ufe0f <b>\u041f\u0440\u043e\u0444\u0438\u043b\u044c \u0441\u043a\u043e\u0440\u043e \u0431\u0443\u0434\u0435\u0442 \u043e\u0447\u0438\u0449\u0435\u043d</b>\n\n"
+                        "\u0417\u0430\u0432\u0442\u0440\u0430 \u0431\u0430\u043b\u043b\u044b \u0438 \u0443\u0440\u043e\u0432\u0435\u043d\u044c \u0431\u0443\u0434\u0443\u0442 \u0431\u0435\u0437\u0432\u043e\u0437\u0432\u0440\u0430\u0442\u043d\u043e \u043e\u0431\u043d\u0443\u043b\u0435\u043d\u044b.\n"
+                        "\u0427\u0442\u043e\u0431\u044b \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0438\u0445 \u2014 \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u0435 \u043f\u0440\u043e\u0444\u0438\u043b\u044c \u0432 \u0440\u0430\u0437\u0434\u0435\u043b\u0435 \u00ab\u041f\u0440\u043e\u0444\u0438\u043b\u044c\u00bb."
+                    )
+                except Exception:
+                    pass
+                await asyncio.sleep(0.05)
+            if warn_ids:
+                log.info("Deletion warnings sent: %d", len(warn_ids))
+            purged = await db.purge_expired_profiles()
+            if purged:
+                log.info("Profiles purged: %d", purged)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.exception("deletion cleanup loop: %s", e)
+            await asyncio.sleep(60)
