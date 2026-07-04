@@ -87,6 +87,7 @@ async def main():
     bg = [
         asyncio.create_task(tasks.daily_burn_loop()),
         asyncio.create_task(tasks.birthday_loop(bot)),
+        asyncio.create_task(tasks.deletion_cleanup_loop(bot)),
     ]
 
     try:

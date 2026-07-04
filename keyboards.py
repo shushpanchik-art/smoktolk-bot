@@ -55,6 +55,7 @@ def kb_profile(age_verified: bool) -> InlineKeyboardMarkup:
         b.button(text="🔞 Подтвердить возраст", callback_data="verify_start")
     b.button(text="🎂 Указать день рождения", callback_data="profile_set_bday")
     b.button(text="🔔 Уведомления", callback_data="profile_toggle_notify")
+    b.button(text="🗑 Удалить профиль", callback_data="profile_delete")
     b.button(text="« Назад", callback_data="back_main")
     b.adjust(1)
     return b.as_markup()
@@ -254,4 +255,19 @@ def kb_product_card(category, maker_idx=None, page=None):
         back = f"cat_cat:{category}"
     b.button(text="« К товарам", callback_data=back)
     b.adjust(1, 1)
+    return b.as_markup()
+
+
+def kb_delete_confirm() -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="✅ Да, удалить профиль", callback_data="profile_delete_yes")
+    b.button(text="« Отмена", callback_data="profile_main")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def kb_restore() -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="♻️ Восстановить профиль", callback_data="profile_restore")
+    b.adjust(1)
     return b.as_markup()

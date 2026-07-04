@@ -1,5 +1,6 @@
 """Вся работа с БД. Только async, через aiosqlite. Никаких глобальных кэшей."""
 import aiosqlite
+import db_deletion
 import logging
 import secrets
 import string
@@ -128,6 +129,7 @@ async def init():
     async with aiosqlite.connect(DB_PATH) as conn:
         await conn.executescript(SCHEMA)
         await conn.commit()
+    await db_deletion.migrate_deletion_columns(DB_PATH)
     log.info("DB initialized: %s", DB_PATH)
 
 
@@ -757,3 +759,20 @@ async def admin_adjust_points(user_id: int, delta: int, reason: str, admin_id: i
             pass
         await conn.commit()
         return old_balance, new_balance
+
+
+# ============== PROFILE DELETION (soft-delete + grace period) ==============
+async def soft_delete_profile(user_id: int, by: str = "user"):
+    await db_deletion.soft_delete_profile(DB_PATH, user_id, by)
+
+
+async def restore_profile(user_id: int) -> dict:
+    return await db_deletion.restore_profile(DB_PATH, user_id)
+
+
+async def warn_before_purge_candidates() -> list[int]:
+    return await db_deletion.warn_before_purge_candidates(DB_PATH)
+
+
+async def purge_expired_profiles() -> int:
+    return await db_deletion.purge_expired_profiles(DB_PATH)
