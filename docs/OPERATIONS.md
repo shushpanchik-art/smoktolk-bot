@@ -6,6 +6,33 @@
 
 ---
 
+## 0. Доступ и sudo
+
+На сервере `telegram-bot` рабочий пользователь — `shushpanchik_art`.
+Для него настроен `sudo` с правилом **`NOPASSWD: ALL`**
+(проверить: `sudo -n -l`). Практические следствия:
+
+- **Пароль root НЕ нужен и НЕ спрашивается**, если команда идёт через `sudo`.
+- Если система вдруг просит пароль (`Authenticating as: root` / `Password:`),
+  значит команду запустили **без** `sudo` — она пошла через polkit.
+  Нажми `Ctrl+C` и запусти ту же команду **с `sudo` в начале**.
+- **Не** используй `sudo -i`, `sudo su`, `sudo bash` — они открывают
+  интерактивный root-шелл, который «зависает». Всегда пиши команду целиком:
+  `sudo <команда>`.
+
+Базовые команды управления ботом:
+
+    sudo systemctl restart  smoktolk-bot.service    # рестарт после обновления кода
+    sudo systemctl status   smoktolk-bot.service    # статус (Active, Main PID, память)
+    sudo systemctl is-active smoktolk-bot.service   # коротко: active / inactive
+    sudo journalctl -u smoktolk-bot.service -n 50    # последние 50 строк логов
+    sudo journalctl -u smoktolk-bot.service -f       # логи в реальном времени (Ctrl+C выход)
+
+Проверка, что рестарт реально произошёл: `Main PID` в `status` должен
+**измениться** после команды restart.
+
+---
+
 ## 1. Деплой systemd-юнитов
 
 ### Source of Truth
