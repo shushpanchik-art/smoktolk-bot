@@ -6,6 +6,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
 import db
+import msg_wipe
+from config import DB_PATH
 from db import BirthdayAlreadySetError
 import keyboards as kb
 from config import LEVELS, REDEEM_QR_TTL_MINUTES, MIN_REDEEM_POINTS
@@ -51,7 +53,7 @@ async def profile_main(cb: CallbackQuery):
         f"Покупок: {user['purchases_count']} (на {user['total_spent']} ₽)\n"
         f"Уведомления: {'🔔 вкл' if user['notifications_enabled'] else '🔕 выкл'}\n"
     )
-    await cb.message.edit_text(text, reply_markup=kb.kb_profile(bool(user["age_verified"])))
+    await cb.message.edit_text(text, reply_markup=kb.kb_profile(bool(user["age_verified"]), user["user_id"]))
     await cb.answer()
 
 
@@ -277,6 +279,10 @@ async def profile_delete(cb: CallbackQuery):
 @router.callback_query(F.data == "profile_delete_yes")
 async def profile_delete_yes(cb: CallbackQuery):
     await db.soft_delete_profile(cb.from_user.id, by="user")
+    try:
+        await msg_wipe.wipe_recent(cb.message.bot, DB_PATH, cb.from_user.id)
+    except Exception as e:
+        logging.getLogger(__name__).warning("wipe on delete failed: %s", e)
     text = (
         "✅ <b>Профиль удалён</b>\n\n"
         "Баллы и уровень сохранятся ещё <b>30 дней</b>. "
@@ -307,4 +313,4 @@ async def profile_restore(cb: CallbackQuery):
         f"Покупок: {user['purchases_count']} (на {user['total_spent']} ₽)\n"
         f"Уведомления: {'🔔 вкл' if user['notifications_enabled'] else '🔕 выкл'}\n"
     )
-    await cb.message.edit_text(text, reply_markup=kb.kb_profile(bool(user["age_verified"])))
+    await cb.message.edit_text(text, reply_markup=kb.kb_profile(bool(user["age_verified"]), user["user_id"]))

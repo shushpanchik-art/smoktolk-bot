@@ -315,6 +315,30 @@ PR title должен следовать тому же формату Convention
 - Команды для запуска — копируемые целиком, без сокращений.
 ---
 
+## 🏗 Архитектурная шпаргалка
+
+Быстрая справка по устройству продакшн-окружения и ключевым решениям (полное описание — в SPEC.md).
+
+**Окружение и запуск:**
+- **Python: только `venv/bin/python`**, НЕ системный `python3` (в системном нет зависимостей проекта). Все команды импорт-проверки и запуска — через venv.
+- Прод запускается под **systemd**: `ExecStart=/opt/smoktolk/bot/venv/bin/python bot.py`, `WorkingDirectory=/opt/smoktolk/bot`. Управление: `systemctl restart smoktolk-bot` (уточни точное имя unit через `systemctl list-units | grep smoktolk`).
+
+**Стек:**
+- Фреймворк — **aiogram 3.29.1**.
+- БД — **SQLite** через `aiosqlite`, путь в `config.DB_PATH`.
+- Веб — **aiohttp** (вебхук кассы, порт `config.WEBHOOK_PORT`).
+- Хендлеры — `handlers/*.py`, роутеры собираются в `ROUTERS`.
+
+**Проверки перед коммитом:**
+- Синтаксис (не требует venv): `python3 -c "import ast; ast.parse(open('bot.py').read())"`.
+- Импорт-проверка модулей — **только** `venv/bin/python -c "import ..."`.
+
+**Тонкости aiogram:**
+- API-layer middleware (перехват вызовов Bot API) регистрируется через `bot.session.middleware.register(fn)`. Сигнатура: `async def fn(make_request, bot, method)`. ⚠️ `bot.session.middleware(fn)` (без `.register`) — падает.
+- Модуль `msg_wipe`: логирует `message_id` исходящих сообщений бота в таблицу `bot_messages` и умеет удалять собственные сообщения моложе 48 ч (ограничение Bot API). Полное стирание истории чата боту недоступно.
+
+---
+
 ## Security
 
 ### Никогда не коммить

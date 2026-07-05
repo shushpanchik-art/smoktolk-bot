@@ -18,6 +18,8 @@ import webhook
 import tasks
 from handlers import ROUTERS
 import crash_alert
+import msg_wipe
+import msg_wipe_mw
 
 
 def setup_logging():
@@ -43,6 +45,7 @@ def setup_logging():
 
 async def on_startup(bot: Bot):
     await db.init_db()
+    await msg_wipe.migrate_msg_log(config.DB_PATH)
     await catalog.refresh(force=True)
     await bot.set_my_commands([
         BotCommand(command="start", description="Запустить бота / главное меню"),
@@ -66,6 +69,7 @@ async def main():
         token=config.BOT_TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+    bot.session.middleware.register(msg_wipe_mw.bot_outgoing_logger)
     dp = Dispatcher(storage=MemoryStorage())
     for r in ROUTERS:
         dp.include_router(r)

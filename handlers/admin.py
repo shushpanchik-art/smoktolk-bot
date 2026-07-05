@@ -171,7 +171,7 @@ async def _send_user_card(msg_or_cb, user_id: int):
             f"Реф-код: <code>{u['referral_code']}</code>\n"
             f"Создан: {fmt_dt_iso(u['created_at'])}"
         )
-        kbm = kb.kb_admin_user_card(user_id)
+        kbm = kb.kb_admin_user_card(user_id, u["username"])
     if isinstance(msg_or_cb, Message):
         await msg_or_cb.answer(text, reply_markup=kbm)
     else:
