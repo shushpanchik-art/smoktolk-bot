@@ -48,8 +48,10 @@ def kb_back_main() -> InlineKeyboardMarkup:
     return b.as_markup()
 
 
-def kb_profile(age_verified: bool) -> InlineKeyboardMarkup:
+def kb_profile(age_verified: bool, user_id: int | None = None) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
+    if user_id is not None:
+        b.button(text=f"\U0001F4CB Скопировать ID: {user_id}", copy_text=CopyTextButton(text=str(user_id)))
     b.button(text="📜 История операций", callback_data="profile_history")
     if not age_verified:
         b.button(text="🔞 Подтвердить возраст", callback_data="verify_start")
@@ -189,17 +191,21 @@ def kb_admin_back() -> InlineKeyboardMarkup:
     return b.as_markup()
 
 
-def kb_admin_user_card(user_id: int) -> InlineKeyboardMarkup:
+def kb_admin_user_card(user_id: int, username: str | None = None) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     b.button(text=f"\U0001F4CB Скопировать ID: {user_id}", copy_text=CopyTextButton(text=str(user_id)))
-    b.button(text="\u2709\ufe0f Написать", url=f"tg://user?id={user_id}")
+    if username:
+        b.button(text="\u2709\ufe0f Написать", url=f"https://t.me/{username}")
     b.button(text="➕ Начислить", callback_data=f"adm_pts_add:{user_id}")
     b.button(text="➖ Списать", callback_data=f"adm_pts_sub:{user_id}")
     b.button(text="🎂 Изменить ДР", callback_data=f"adm_bday_set:{user_id}")
     b.button(text="🔞 Тогл возраст", callback_data=f"adm_age_toggle:{user_id}")
     b.button(text="📜 История", callback_data=f"adm_user_hist:{user_id}")
     b.button(text="« К поиску", callback_data="adm_users")
-    b.adjust(2, 2, 1, 1, 1, 1)
+    if username:
+        b.adjust(2, 2, 1, 1, 1, 1)
+    else:
+        b.adjust(1, 2, 1, 1, 1, 1)
     return b.as_markup()
 
 

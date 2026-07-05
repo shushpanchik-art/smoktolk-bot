@@ -8,6 +8,14 @@
 
 ## [Unreleased]
 
+### Added — Стирание сообщений бота при удалении профиля (PR feature/msg-wipe)
+
+- **`msg_wipe.py`** — новый модуль: таблица `bot_messages` (chat_id, message_id, sent_at), функции `migrate_msg_log`, `log_message`, `wipe_recent`. Удаляет собственные сообщения бота моложе 48 ч через batch `deleteMessages` (до 100 id за раз) с fallback на поштучное удаление при `TelegramBadRequest`. Полное стирание истории боту недоступно (ограничение Bot API) — это задокументировано в docstring модуля.
+- **`msg_wipe_mw.py`** — API-layer middleware aiogram 3: регистрируется через `bot.session.middleware.register(...)`, перехватывает каждый вызов Bot API и логирует `message_id` всех отправленных ботом сообщений (включая `send_media_group`).
+- **`bot.py`** — при старте вызывается `msg_wipe.migrate_msg_log(config.DB_PATH)`; middleware логгера регистрируется через `bot.session.middleware.register(...)` (важно: `session.middleware(fn)` — ошибка, падает).
+- **`handlers/profile.py`, `handlers/admin.py`, `keyboards.py`, `services/admin_notify.py`** — интеграция вайпа недавних сообщений бота при удалении профиля пользователя.
+
+
 ### Added — Статус выполнения обновления каталога (PR feature/admin-tools)
 
 - **`handlers/admin.py`** — обработчик обновления ассортимента теперь показывает поэтапный прогресс через `edit_text`: «⏳ Загружаю прайс…» → «🔄 Нормализую категории…» → «✅ Готово: N товаров, M категорий». Ошибки парсинга перехватываются и выводятся администратору отдельным сообщением.

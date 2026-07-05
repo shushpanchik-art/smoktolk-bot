@@ -15,6 +15,7 @@ from typing import Optional
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CopyTextButton
 
 from config import ADMIN_ID
 
@@ -69,8 +70,14 @@ async def notify_admin_new_user(
     text = _fmt_user(user)
     text += f"\n👥 Реферер: {_fmt_referrer(referrer)}"
 
+    kbm = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text=f"\U0001F4CB Скопировать ID: {user.get('user_id')}",
+            copy_text=CopyTextButton(text=str(user.get("user_id"))),
+        )
+    ]])
     try:
-        await bot.send_message(ADMIN_ID, text, parse_mode="HTML")
+        await bot.send_message(ADMIN_ID, text, parse_mode="HTML", reply_markup=kbm)
         log.info("admin notified about new user %s", user.get("user_id"))
         return True
     except TelegramAPIError as e:
