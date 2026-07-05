@@ -170,8 +170,9 @@ async def _send_user_card(msg_or_cb, user_id: int):
             f"на {u['total_spent']} ₽\n"
             f"Реф-код: <code>{u['referral_code']}</code>\n"
             f"Создан: {fmt_dt_iso(u['created_at'])}"
+            + (f"\n\n🗑 <b>УДАЛЁН</b> ({fmt_dt_iso(u['deleted_at'])}, by {esc(str(u['deleted_by'] or '—'))})" if u["deleted_at"] else "")
         )
-        kbm = kb.kb_admin_user_card(user_id, u["username"])
+        kbm = kb.kb_admin_user_card(user_id, u["username"], deleted=bool(u["deleted_at"]))
     if isinstance(msg_or_cb, Message):
         await msg_or_cb.answer(text, reply_markup=kbm)
     else:
@@ -362,3 +363,50 @@ async def adm_bc_go(cb: CallbackQuery, state: FSMContext, bot: Bot):
         await asyncio.sleep(0.05)  # ~20 msg/s
     await cb.message.answer(f"✅ Готово.\nДоставлено: {ok}\nОшибок: {err}",
                             reply_markup=kb.kb_admin_back())
+
+
+# ============== УДАЛЕНИЕ / ВОССТАНОВЛЕНИЕ ПРОФИЛЯ (админ) ==============
+@router.callback_query(F.data.startswith("adm_del:"))
+async def adm_del(cb: CallbackQuery):
+    if not _is_admin(cb.from_user.id):
+        return await cb.answer("Нет доступа", show_alert=True)
+    uid = int(cb.data.split(":")[1])
+    await cb.message.edit_text(
+        f"⚠️ Точно удалить профиль <code>{uid}</code>?\n\n"
+        f"Профиль будет скрыт. Баллы/уровень сохраняются 30 дней "
+        f"(грейс-период), затем физически удаляются. Можно восстановить.",
+        reply_markup=kb.kb_admin_del_confirm(uid),
+    )
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("adm_del_no:"))
+async def adm_del_no(cb: CallbackQuery):
+    if not _is_admin(cb.from_user.id):
+        return await cb.answer("Нет доступа", show_alert=True)
+    uid = int(cb.data.split(":")[1])
+    await _send_user_card(cb, uid)
+    await cb.answer("Отменено")
+
+
+@router.callback_query(F.data.startswith("adm_del_yes:"))
+async def adm_del_yes(cb: CallbackQuery):
+    if not _is_admin(cb.from_user.id):
+        return await cb.answer("Нет доступа", show_alert=True)
+    uid = int(cb.data.split(":")[1])
+    await db.soft_delete_profile(uid, by="admin")
+    await _send_user_card(cb, uid)
+    await cb.answer("Профиль удалён", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("adm_restore:"))
+async def adm_restore(cb: CallbackQuery):
+    if not _is_admin(cb.from_user.id):
+        return await cb.answer("Нет доступа", show_alert=True)
+    uid = int(cb.data.split(":")[1])
+    res = await db.restore_profile(uid)
+    await _send_user_card(cb, uid)
+    if res.get("points_lost"):
+        await cb.answer("Восстановлен, но баллы уже были очищены", show_alert=True)
+    else:
+        await cb.answer("Профиль восстановлен", show_alert=True)

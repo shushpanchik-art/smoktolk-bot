@@ -191,7 +191,7 @@ def kb_admin_back() -> InlineKeyboardMarkup:
     return b.as_markup()
 
 
-def kb_admin_user_card(user_id: int, username: str | None = None) -> InlineKeyboardMarkup:
+def kb_admin_user_card(user_id: int, username: str | None = None, deleted: bool = False) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     b.button(text=f"\U0001F4CB Скопировать ID: {user_id}", copy_text=CopyTextButton(text=str(user_id)))
     if username:
@@ -201,11 +201,23 @@ def kb_admin_user_card(user_id: int, username: str | None = None) -> InlineKeybo
     b.button(text="🎂 Изменить ДР", callback_data=f"adm_bday_set:{user_id}")
     b.button(text="🔞 Тогл возраст", callback_data=f"adm_age_toggle:{user_id}")
     b.button(text="📜 История", callback_data=f"adm_user_hist:{user_id}")
+    if deleted:
+        b.button(text="♻️ Восстановить", callback_data=f"adm_restore:{user_id}")
+    else:
+        b.button(text="🗑 Удалить профиль", callback_data=f"adm_del:{user_id}")
     b.button(text="« К поиску", callback_data="adm_users")
     if username:
-        b.adjust(2, 2, 1, 1, 1, 1)
+        b.adjust(2, 2, 1, 1, 1, 1, 1)
     else:
-        b.adjust(1, 2, 1, 1, 1, 1)
+        b.adjust(1, 2, 1, 1, 1, 1, 1)
+    return b.as_markup()
+
+
+def kb_admin_del_confirm(user_id: int) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(text="✅ Да, удалить", callback_data=f"adm_del_yes:{user_id}")
+    b.button(text="« Отмена", callback_data=f"adm_del_no:{user_id}")
+    b.adjust(1)
     return b.as_markup()
 
 
