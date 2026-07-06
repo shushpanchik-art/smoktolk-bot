@@ -179,9 +179,10 @@ def kb_admin_main() -> InlineKeyboardMarkup:
     b.button(text="🎁 Подарки", callback_data="adm_gifts")
     b.button(text="📢 Рассылка", callback_data="adm_broadcast")
     b.button(text="🔄 Обновить ассортимент", callback_data="adm_refresh_catalog")
+    b.button(text="🖼 Картинки продукции", callback_data="adm_images")
     b.button(text="💾 Создать бэкап", callback_data="adm_backup")
     b.button(text="« В меню", callback_data="back_main")
-    b.adjust(3, 2, 2, 2, 1)
+    b.adjust(3, 2, 2, 2, 1, 1)
     return b.as_markup()
 
 

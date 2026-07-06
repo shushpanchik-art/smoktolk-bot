@@ -122,6 +122,11 @@ CREATE TABLE IF NOT EXISTS daily_stats (
     points_burned INTEGER DEFAULT 0,
     gifts_redeemed INTEGER DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS product_images (
+    name_key TEXT PRIMARY KEY,
+    image_url TEXT NOT NULL,
+    updated_at TEXT
+);
 """
 
 
@@ -776,3 +781,33 @@ async def warn_before_purge_candidates() -> list[int]:
 
 async def purge_expired_profiles() -> int:
     return await db_deletion.purge_expired_profiles(DB_PATH)
+
+
+# ============== PRODUCT IMAGES ==============
+async def set_product_images(pairs) -> int:
+    """pairs: list[(name_key, image_url)]. Полная замена таблицы. Возврат: кол-во."""
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("DELETE FROM product_images")
+        now = _now()
+        await conn.executemany(
+            "INSERT OR REPLACE INTO product_images(name_key, image_url, updated_at) VALUES (?,?,?)",
+            [(k, u, now) for k, u in pairs],
+        )
+        await conn.commit()
+    return len(pairs)
+
+
+async def get_product_image(name_key: str):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cur = await conn.execute(
+            "SELECT image_url FROM product_images WHERE name_key=?", (name_key,)
+        )
+        row = await cur.fetchone()
+        return row[0] if row else None
+
+
+async def count_product_images() -> int:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cur = await conn.execute("SELECT COUNT(*) FROM product_images")
+        row = await cur.fetchone()
+        return row[0] if row else 0

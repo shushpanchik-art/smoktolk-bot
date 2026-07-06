@@ -14,8 +14,6 @@ log = logging.getLogger(__name__)
 
 
 def norm_key(name: str) -> str:
-    """Нормализованный ключ названия для точного матча:
-    lower + схлопывание пробелов + strip."""
     if not name:
         return ""
     s = str(name).replace("\xa0", " ").strip().lower()
@@ -23,42 +21,73 @@ def norm_key(name: str) -> str:
     return s
 
 
-# Заголовки, по которым определяем колонку названия и колонку ссылки.
 _NAME_HEADERS = ("товар", "наименован", "название", "name")
-_URL_HEADERS = ("ссылк", "url")  # приоритетные
-_URL_HEADERS_FALLBACK = ("фото", "картин", "image", "изображ")  # запасные
+_URL_HEADERS = ("ссылк", "url", "фото", "картин", "image", "изображ")
 
 
 def _looks_like_url(v: Any) -> bool:
     return isinstance(v, str) and v.strip().lower().startswith(("http://", "https://"))
 
 
+def _count_urls_in_col(rows: list[tuple], header_idx: int, col: int) -> int:
+    """Сколько http-значений в колонке col в строках данных."""
+    cnt = 0
+    for row in rows[header_idx + 1:]:
+        if not row or col >= len(row):
+            continue
+        if _looks_like_url(row[col]):
+            cnt += 1
+    return cnt
+
+
 def _find_columns(rows: list[tuple]) -> Optional[tuple[int, int, int]]:
-    """Находит (header_idx, name_col, url_col). None если не найдено."""
+    """Находит (header_idx, name_col, url_col).
+
+    URL-колонку выбираем по ФАКТИЧЕСКОМУ содержимому: среди всех колонок,
+    чей заголовок похож на url/фото/ссылку, берём ту, где больше http-значений.
+    Если ни в одной такой колонке нет URL — сканируем все колонки.
+    """
     for idx, row in enumerate(rows[:15]):
         if not row:
             continue
-        name_col = url_col = url_fallback = None
+        name_col = None
+        url_candidates: list[int] = []
         for ci, cell in enumerate(row):
             if not isinstance(cell, str):
                 continue
             low = cell.strip().lower()
             if name_col is None and any(h in low for h in _NAME_HEADERS):
                 name_col = ci
-            if url_col is None and any(h in low for h in _URL_HEADERS):
-                url_col = ci
-            if url_fallback is None and any(h in low for h in _URL_HEADERS_FALLBACK):
-                url_fallback = ci
-        chosen_url = url_col if url_col is not None else url_fallback
-        if name_col is not None and chosen_url is not None:
-            return idx, name_col, chosen_url
+            if any(h in low for h in _URL_HEADERS):
+                url_candidates.append(ci)
+        if name_col is None:
+            continue
+
+        # выбираем url-колонку по реальному наличию http в данных
+        best_url = None
+        best_cnt = 0
+        for ci in url_candidates:
+            c = _count_urls_in_col(rows, idx, ci)
+            if c > best_cnt:
+                best_cnt = c
+                best_url = ci
+        # если по заголовкам не нашли данных — сканируем ВСЕ колонки
+        if best_url is None:
+            ncols = max(len(r) for r in rows[idx + 1:idx + 30] if r) if len(rows) > idx + 1 else 0
+            for ci in range(ncols):
+                if ci == name_col:
+                    continue
+                c = _count_urls_in_col(rows, idx, ci)
+                if c > best_cnt:
+                    best_cnt = c
+                    best_url = ci
+
+        if best_url is not None and best_cnt > 0:
+            return idx, name_col, best_url
     return None
 
 
 def parse_images_xlsx(path: str) -> tuple[list[tuple[str, str]], dict]:
-    """Читает файл, возвращает (pairs, stats).
-    pairs = [(norm_key(name), image_url), ...] только валидные URL.
-    """
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     stats = {"sheets_tried": [], "rows": 0, "matched_cols": None,
              "with_url": 0, "no_url": 0, "no_name": 0}
@@ -70,7 +99,6 @@ def parse_images_xlsx(path: str) -> tuple[list[tuple[str, str]], dict]:
             continue
         found = _find_columns(rows)
         if not found:
-            # эвристика: колонка названия=перв. текстовая, ссылка=любая с http
             found = _fallback_columns(rows)
         if not found:
             stats["sheets_tried"].append(f"{ws.title}: колонки не найдены")
@@ -98,14 +126,11 @@ def parse_images_xlsx(path: str) -> tuple[list[tuple[str, str]], dict]:
     wb.close()
     stats["with_url"] = len(best)
     stats["rows"] = len(best)
-    # dedup по ключу (последнее значение побеждает)
     dedup = dict(best)
     return list(dedup.items()), stats
 
 
 def _fallback_columns(rows: list[tuple]) -> Optional[tuple[int, int, int]]:
-    """Если заголовки не распознаны: ищем строку данных, где есть http-ячейка,
-    берём её как url_col, а первую длинную текстовую (не http) — как name_col."""
     for idx, row in enumerate(rows[:30]):
         if not row:
             continue
