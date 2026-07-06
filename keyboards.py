@@ -222,9 +222,21 @@ def kb_admin_del_confirm(user_id: int) -> InlineKeyboardMarkup:
     return b.as_markup()
 
 
-def kb_broadcast_confirm() -> InlineKeyboardMarkup:
+def kb_broadcast_mode() -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
-    b.button(text="✅ Разослать всем", callback_data="adm_bc_go")
+    b.button(text="📢 Общая (всем)", callback_data="adm_bc_mode:all")
+    b.button(text="🧪 Тестовая (по ID)", callback_data="adm_bc_mode:test")
+    b.button(text="« К админке", callback_data="admin_main")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def kb_broadcast_confirm(mode: str = "all", count: int = 0) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    if mode == "test":
+        b.button(text=f"✅ Отправить тест ({count})", callback_data="adm_bc_go")
+    else:
+        b.button(text="✅ Разослать всем", callback_data="adm_bc_go")
     b.button(text="« Отмена", callback_data="admin_main")
     b.adjust(1)
     return b.as_markup()

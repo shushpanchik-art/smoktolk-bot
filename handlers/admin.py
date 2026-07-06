@@ -22,6 +22,7 @@ class Adm(StatesGroup):
     user_search = State()
     pts_amount = State()
     broadcast_text = State()
+    broadcast_test_ids = State()
     img_upload = State()
 
 
@@ -384,20 +385,95 @@ async def adm_broadcast(cb: CallbackQuery, state: FSMContext):
     if not _is_admin(cb.from_user.id):
         await cb.answer()
         return
-    await state.set_state(Adm.broadcast_text)
+    await state.clear()
     await cb.message.edit_text(
-        "📢 Пришлите текст рассылки (HTML-теги поддерживаются):",
+        "📢 <b>Рассылка</b>\n\nВыберите тип:",
+        reply_markup=kb.kb_broadcast_mode()
+    )
+    await cb.answer()
+
+
+@router.callback_query(F.data == "adm_bc_mode:all")
+async def adm_bc_mode_all(cb: CallbackQuery, state: FSMContext):
+    if not _is_admin(cb.from_user.id):
+        await cb.answer()
+        return
+    await state.set_state(Adm.broadcast_text)
+    await state.update_data(bc_mode="all", bc_ids=None)
+    await cb.message.edit_text(
+        "📢 <b>Общая рассылка</b>\n\nПришлите текст (HTML-теги поддерживаются):",
         reply_markup=kb.kb_admin_back()
     )
     await cb.answer()
+
+
+@router.callback_query(F.data == "adm_bc_mode:test")
+async def adm_bc_mode_test(cb: CallbackQuery, state: FSMContext):
+    if not _is_admin(cb.from_user.id):
+        await cb.answer()
+        return
+    await state.set_state(Adm.broadcast_test_ids)
+    await state.update_data(bc_mode="test")
+    await cb.message.edit_text(
+        "🧪 <b>Тестовая рассылка</b>\n\n"
+        "Пришлите ID пользователей.\n"
+        "Можно через запятую, пробел или с новой строки.\n\n"
+        "Например:\n<code>12345, 67890 111213</code>",
+        reply_markup=kb.kb_admin_back()
+    )
+    await cb.answer()
+
+
+@router.message(Adm.broadcast_test_ids)
+async def adm_bc_test_ids(msg: Message, state: FSMContext):
+    if not _is_admin(msg.from_user.id):
+        return
+    import re as _re
+    raw = _re.split(r"[\s,]+", (msg.text or "").strip())
+    ids = []
+    bad = []
+    for tok in raw:
+        if not tok:
+            continue
+        if tok.lstrip("-").isdigit():
+            ids.append(int(tok))
+        else:
+            bad.append(tok)
+    # уникальные, сохраняя порядок
+    seen = set()
+    ids = [x for x in ids if not (x in seen or seen.add(x))]
+    if not ids:
+        await msg.answer(
+            "❌ Не найдено ни одного корректного ID. Попробуйте ещё раз.",
+            reply_markup=kb.kb_admin_back()
+        )
+        return
+    await state.update_data(bc_ids=ids)
+    await state.set_state(Adm.broadcast_text)
+    warn = f"\n⚠️ Пропущено (не число): {esc(', '.join(bad))}" if bad else ""
+    await msg.answer(
+        f"✅ Принято ID: <b>{len(ids)}</b>{warn}\n\n"
+        "Теперь пришлите текст рассылки (HTML-теги поддерживаются):",
+        reply_markup=kb.kb_admin_back()
+    )
 
 
 @router.message(Adm.broadcast_text)
 async def adm_broadcast_preview(msg: Message, state: FSMContext):
     if not _is_admin(msg.from_user.id):
         return
+    data = await state.get_data()
+    mode = data.get("bc_mode", "all")
+    ids = data.get("bc_ids") or []
     await state.update_data(text=msg.html_text)
-    await msg.answer("Превью:\n\n" + msg.html_text, reply_markup=kb.kb_broadcast_confirm())
+    if mode == "test":
+        head = f"🧪 <b>Тестовая рассылка</b> — получателей: {len(ids)}\n\n"
+    else:
+        head = "📢 <b>Общая рассылка</b> (всем)\n\n"
+    await msg.answer(
+        head + "Превью:\n\n" + msg.html_text,
+        reply_markup=kb.kb_broadcast_confirm(mode=mode, count=len(ids))
+    )
 
 
 @router.callback_query(F.data == "adm_bc_go")
@@ -408,21 +484,35 @@ async def adm_bc_go(cb: CallbackQuery, state: FSMContext, bot: Bot):
     data = await state.get_data()
     await state.clear()
     text = data.get("text")
+    mode = data.get("bc_mode", "all")
     if not text:
         await cb.answer("Нет текста", show_alert=True)
         return
-    ids = await db.all_user_ids(only_with_notifications=True)
-    await cb.message.edit_text(f"📢 Рассылка идёт ({len(ids)} получателей)…")
+    if mode == "test":
+        ids = data.get("bc_ids") or []
+        if not ids:
+            await cb.answer("Нет ID", show_alert=True)
+            return
+        label = "🧪 Тестовая рассылка"
+    else:
+        ids = await db.all_user_ids(only_with_notifications=True)
+        label = "📢 Рассылка"
+    await cb.message.edit_text(f"{label} идёт ({len(ids)} получателей)…")
     ok = err = 0
+    fails = []
     for uid in ids:
         try:
             await bot.send_message(uid, text)
             ok += 1
         except Exception:
             err += 1
+            if mode == "test":
+                fails.append(uid)
         await asyncio.sleep(0.05)  # ~20 msg/s
-    await cb.message.answer(f"✅ Готово.\nДоставлено: {ok}\nОшибок: {err}",
-                            reply_markup=kb.kb_admin_back())
+    report = f"✅ Готово.\nДоставлено: {ok}\nОшибок: {err}"
+    if mode == "test" and fails:
+        report += "\n\nНе доставлено:\n" + "\n".join(f"• <code>{u}</code>" for u in fails[:30])
+    await cb.message.answer(report, reply_markup=kb.kb_admin_back())
 
 
 # ============== УДАЛЕНИЕ / ВОССТАНОВЛЕНИЕ ПРОФИЛЯ (админ) ==============
