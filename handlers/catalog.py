@@ -4,10 +4,24 @@ from aiogram.types import CallbackQuery
 import catalog
 import keyboards as kb
 import catalog_norm
+import db
+import product_images as _pimg
 from utils import esc
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 router = Router()
+
+
+async def _edit_or_send(cb, text, reply_markup):
+    """edit_text; если текущее сообщение — фото/нельзя редактировать, удалить и отправить новое."""
+    try:
+        await cb.message.edit_text(text, reply_markup=reply_markup)
+    except Exception:
+        try:
+            await cb.message.delete()
+        except Exception:
+            pass
+        await cb.message.answer(text, reply_markup=reply_markup)
 
 
 def _sorted_makers(products):
@@ -19,12 +33,12 @@ def _sorted_makers(products):
 async def catalog_main(cb: CallbackQuery):
     products = await catalog.get_products()
     if not products:
-        await cb.message.edit_text("Ассортимент пока не загружен.", reply_markup=kb.kb_back_main())
+        await _edit_or_send(cb, "Ассортимент пока не загружен.", kb.kb_back_main())
         await cb.answer()
         return
     cats = sorted({p["category"] for p in products})
     text = "<b>Ассортимент</b>\n\nЦены и наличие - для информации.\n\nВыберите категорию:"
-    await cb.message.edit_text(text, reply_markup=kb.kb_catalog_categories(cats))
+    await _edit_or_send(cb, text, kb.kb_catalog_categories(cats))
     await cb.answer()
 
 
@@ -38,7 +52,7 @@ async def cat_category(cb: CallbackQuery):
     makers = _sorted_makers(products)
     title = catalog_norm.category_title(cat)
     text = f"<b>{esc(title)}</b>\n\nВыберите производителя:"
-    await cb.message.edit_text(text, reply_markup=kb.kb_catalog_makers(makers, cat))
+    await _edit_or_send(cb, text, kb.kb_catalog_makers(makers, cat))
     await cb.answer()
 
 
@@ -61,10 +75,7 @@ async def _show_maker(cb, cat, idx, page):
     chunk = products[page * MAKER_PER_PAGE:(page + 1) * MAKER_PER_PAGE]
     title = catalog_norm.category_title(cat)
     text = f"<b>{esc(maker)}</b>\n<i>{esc(title)}</i>\n\nВыберите товар:"
-    await cb.message.edit_text(
-        text,
-        reply_markup=kb.kb_maker_products(chunk, cat, idx, page, total_pages),
-    )
+    await _edit_or_send(cb, text, kb.kb_maker_products(chunk, cat, idx, page, total_pages))
     await cb.answer()
 
 
@@ -108,7 +119,26 @@ async def cat_product(cb: CallbackQuery):
     if p.get("description"):
         lines += ["", esc(str(p["description"]))]
     text = "\n".join(lines)
-    await cb.message.edit_text(text, reply_markup=kb.kb_product_card(cat, bk_idx, bk_page))
+    markup = kb.kb_product_card(cat, bk_idx, bk_page)
+    img = await db.get_product_image(_pimg.norm_key(p.get("raw_name", "")))
+    if img:
+        try:
+            await cb.message.delete()
+        except Exception:
+            pass
+        try:
+            await cb.message.answer_photo(img, caption=text, reply_markup=markup)
+        except Exception:
+            await cb.message.answer(text, reply_markup=markup)
+    else:
+        try:
+            await cb.message.edit_text(text, reply_markup=markup)
+        except Exception:
+            try:
+                await cb.message.delete()
+            except Exception:
+                pass
+            await cb.message.answer(text, reply_markup=markup)
     await cb.answer()
 
 
@@ -118,7 +148,7 @@ async def catalog_consult(cb: CallbackQuery):
     b = InlineKeyboardBuilder()
     b.button(text="« В каталог", callback_data="catalog_main")
     b.adjust(1)
-    await cb.message.edit_text(SUPPORT_TEXT, reply_markup=b.as_markup())
+    await _edit_or_send(cb, SUPPORT_TEXT, b.as_markup())
     await cb.answer()
 
 @router.callback_query(F.data == "noop")

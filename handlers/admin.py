@@ -10,6 +10,7 @@ from aiogram.fsm.state import StatesGroup, State
 import db
 import keyboards as kb
 import catalog
+import product_images
 from config import ADMIN_ID, LEVELS
 from utils import esc, fmt_dt_iso
 
@@ -21,6 +22,7 @@ class Adm(StatesGroup):
     user_search = State()
     pts_amount = State()
     broadcast_text = State()
+    img_upload = State()
 
 
 def _is_admin(uid: int) -> bool:
@@ -468,3 +470,79 @@ async def adm_restore(cb: CallbackQuery):
         await cb.answer("Восстановлен, но баллы уже были очищены", show_alert=True)
     else:
         await cb.answer("Профиль восстановлен", show_alert=True)
+
+
+@router.callback_query(F.data == "adm_images")
+async def adm_images(cb: CallbackQuery, state: FSMContext):
+    if not _is_admin(cb.from_user.id):
+        await cb.answer()
+        return
+    n = await db.count_product_images()
+    await state.set_state(Adm.img_upload)
+    await cb.message.edit_text(
+        "\U0001F5BC Загрузка картинок продукции\n\n"
+        f"Сейчас в базе: <b>{n}</b> картинок.\n\n"
+        "Пришлите Excel-файл (.xlsx). В нём должны быть колонки с "
+        "<b>названием товара</b> и <b>ссылкой на картинку</b> (http/https).\n"
+        "Названия должны точно совпадать с названиями в каталоге.\n\n"
+        "Файл полностью заменяет текущие картинки.",
+        reply_markup=kb.kb_admin_back(),
+    )
+    await cb.answer()
+
+
+@router.message(Adm.img_upload, F.document)
+async def adm_images_upload(msg: Message, state: FSMContext, bot: Bot):
+    if not _is_admin(msg.from_user.id):
+        await state.clear()
+        return
+    doc = msg.document
+    fname = (doc.file_name or "").lower()
+    if not fname.endswith(".xlsx"):
+        await msg.answer("Нужен файл .xlsx. Пришлите ещё раз или нажмите «К админке».",
+                         reply_markup=kb.kb_admin_back())
+        return
+    await state.clear()
+    status = await msg.answer("\u23F3 Скачиваю и разбираю файл…")
+    tmp = f"/tmp/product_images_{msg.from_user.id}.xlsx"
+    try:
+        file = await bot.get_file(doc.file_id)
+        await bot.download_file(file.file_path, tmp)
+        pairs, stats = product_images.parse_images_xlsx(tmp)
+        if not pairs:
+            detail = "; ".join(stats.get("sheets_tried", [])) or "нет данных"
+            await status.edit_text(
+                "\u274C Не удалось найти пары «название — ссылка».\n"
+                f"<code>{esc(detail)}</code>",
+                reply_markup=kb.kb_admin_back(),
+            )
+            return
+        saved = await db.set_product_images(pairs)
+        # проверим сколько совпало с каталогом
+        products = await catalog.get_products()
+        keys = {product_images.norm_key(p.get("raw_name") or p.get("name") or "")
+                for p in products}
+        matched = sum(1 for k, _ in pairs if k in keys)
+        await status.edit_text(
+            f"\u2705 Загружено картинок: <b>{saved}</b>.\n"
+            f"Совпало с товарами каталога: <b>{matched}</b> из {len(products)}.",
+            reply_markup=kb.kb_admin_back(),
+        )
+    except Exception as e:
+        log.exception("adm_images_upload failed")
+        await status.edit_text(
+            f"\u274C Ошибка: <code>{esc(str(e))}</code>",
+            reply_markup=kb.kb_admin_back(),
+        )
+    finally:
+        try:
+            import os
+            os.remove(tmp)
+        except Exception:
+            pass
+
+
+@router.message(Adm.img_upload)
+async def adm_images_wrong(msg: Message):
+    await msg.answer("Пришлите Excel-файл (.xlsx) как документ.",
+                     reply_markup=kb.kb_admin_back())

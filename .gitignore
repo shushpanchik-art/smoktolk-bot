@@ -52,3 +52,4 @@ _patch_*.py
 *.rowsbak
 *.step4bak
 *.widthbak
+data/download_price_list.xlsx
