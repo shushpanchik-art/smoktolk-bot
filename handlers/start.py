@@ -86,6 +86,12 @@ async def start_plain(msg: Message, state: FSMContext):
 
 async def _start_common(msg: Message, state: FSMContext, referrer_id):
     user = await db.get_user(msg.from_user.id)
+    # Удалённый профиль (grace period): прогоняем через онбординг как новичка.
+    # Данные в БД сохранены; восстановление произойдёт после принятия правил.
+    if user and user.get("deleted_at"):
+        await state.set_state(Reg.awaiting_rules)
+        await _send_welcome_disclaimer(msg)
+        return
     if not user:
         user = await db.create_user(
             msg.from_user.id,
@@ -129,8 +135,9 @@ async def _start_common(msg: Message, state: FSMContext, referrer_id):
     await show_main_menu(msg)
 
 
-async def show_main_menu(msg: Message):
-    user = await db.get_user(msg.from_user.id)
+async def show_main_menu(msg: Message, user_id: int | None = None):
+    uid = user_id if user_id is not None else msg.from_user.id
+    user = await db.get_user(uid)
     lvl = LEVELS[user["level"]]
     text = (
         f"🏪 <b>SMOKTOLK</b>\n\n"
@@ -139,7 +146,7 @@ async def show_main_menu(msg: Message):
         f"Покупок: {user['purchases_count']}\n\n"
         "Выберите раздел:"
     )
-    await msg.answer(text, reply_markup=kb.kb_main(msg.from_user.id == ADMIN_ID))
+    await msg.answer(text, reply_markup=kb.kb_main(uid == ADMIN_ID))
 
 
 @router.callback_query(F.data == "show_rules_first")
@@ -150,8 +157,21 @@ async def show_rules_first(cb: CallbackQuery):
 
 @router.callback_query(F.data == "accept_rules")
 async def accept_rules_cb(cb: CallbackQuery, state: FSMContext):
+    # Если это восстанавливаемый профиль — вернём данные (баллы/историю).
+    _pre = await db.get_user(cb.from_user.id)
+    _was_deleted = bool(_pre and _pre.get("deleted_at"))
+    if _was_deleted:
+        await db.restore_profile(cb.from_user.id)
     await db.accept_rules(cb.from_user.id)
     user = await db.get_user(cb.from_user.id)
+    if _was_deleted:
+        await cb.message.answer(
+            "♻️ <b>С возвращением!</b>\nВаши баллы и история восстановлены."
+        )
+        await state.clear()
+        await show_main_menu(cb.message, cb.from_user.id)
+        await cb.answer()
+        return
     if not user["phone"]:
         await state.set_state(Reg.awaiting_phone)
         await cb.message.answer(
@@ -160,7 +180,7 @@ async def accept_rules_cb(cb: CallbackQuery, state: FSMContext):
         )
     else:
         await cb.message.answer("✅ Правила приняты.")
-        await show_main_menu(cb.message)
+        await show_main_menu(cb.message, cb.from_user.id)
     await cb.answer()
 
 
@@ -212,3 +232,22 @@ async def back_to_main(cb: CallbackQuery):
     except Exception:
         await cb.message.answer(text, reply_markup=kb.kb_main(cb.from_user.id == ADMIN_ID))
     await cb.answer()
+
+
+@router.callback_query(F.data == "restore_own_profile")
+async def restore_own_profile_cb(cb: CallbackQuery, state: FSMContext):
+    user = await db.get_user(cb.from_user.id)
+    if not user:
+        await cb.message.answer("Профиль не найден. Введите /start")
+        await cb.answer()
+        return
+    if not user.get("deleted_at"):
+        await cb.answer("Профиль уже активен", show_alert=True)
+        return
+    await db.restore_profile(cb.from_user.id)
+    await cb.answer("Профиль восстановлен", show_alert=False)
+    try:
+        await cb.message.edit_text("♻️ Профиль восстановлен. Данные на месте.")
+    except Exception:
+        await cb.message.answer("♻️ Профиль восстановлен. Данные на месте.")
+    await show_main_menu(cb.message, cb.from_user.id)
