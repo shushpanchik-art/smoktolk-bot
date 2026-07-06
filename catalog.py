@@ -1,7 +1,14 @@
-"""Модуль работы с каталогом товаров (Excel).
+"""Модуль работы с каталогом товаров.
 
-Скачивает файл с Яндекс.Диска (если задан CATALOG_URL) и кэширует
-список товаров в памяти. Используется ботом и handlers/catalog.py.
+ИСТОЧНИК ДАННЫХ: Google-таблица, экспортируемая в формате .xlsx
+(config.CATALOG_URL = ссылка вида docs.google.com/.../export?format=xlsx).
+Файл скачивается функцией _download_direct и сохраняется в data/catalog.xlsx,
+затем парсится _parse_xlsx() и кэшируется в памяти (_products).
+
+Примечание: _download_yadisk оставлена как запасной вариант для ссылок
+Яндекс.Диска, но в текущей конфигурации НЕ используется.
+
+Используется ботом и handlers/catalog.py.
 """
 from __future__ import annotations
 
@@ -308,13 +315,25 @@ def _parse_xlsx(path: str) -> list[dict[str, Any]]:
     return result
 
 
-async def refresh(force: bool = False) -> int:
-    """Обновить каталог. Возвращает кол-во товаров."""
+async def refresh(force: bool = False, progress=None) -> int:
+    """Обновить каталог. Возвращает кол-во товаров.
+
+    progress — необязательный async-callback(stage: str, extra: dict),
+    вызывается на этапах: 'download', 'parse', 'done'.
+    """
     global _products
     url = getattr(config, "CATALOG_URL", "") or ""
 
+    async def _notify(stage, **extra):
+        if progress is not None:
+            try:
+                await progress(stage, extra)
+            except Exception:
+                log.debug("progress callback failed", exc_info=True)
+
     need_download = force or not os.path.exists(CATALOG_FILE)
     if need_download and url:
+        await _notify("download")
         log.info("Downloading catalog from %s", url)
         ok = await _download(url, CATALOG_FILE)
         if not ok:
@@ -325,12 +344,15 @@ async def refresh(force: bool = False) -> int:
         _products = []
         return 0
 
+    await _notify("parse")
     try:
         _products = _parse_xlsx(CATALOG_FILE)
         log.info("Catalog loaded: %d products", len(_products))
     except Exception as e:
         log.exception("Catalog parse error: %s", e)
         _products = []
+
+    await _notify("done", count=len(_products))
     return len(_products)
 
 
