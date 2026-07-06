@@ -12,6 +12,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Any, Optional
@@ -123,7 +124,7 @@ def _sanitize_styles_xml(xml_bytes: bytes) -> bytes:
 def _load_workbook_safe(path: str):
     """Открыть xlsx, при необходимости починив битый styles.xml."""
     try:
-        return openpyxl.load_workbook(path, data_only=True)
+        return openpyxl.load_workbook(path, read_only=True, data_only=True)
     except ValueError as e:
         msg = str(e).lower()
         if "style" not in msg and "stylesheet" not in msg:
@@ -192,7 +193,7 @@ def _find_header_row(rows: list) -> tuple[int, dict[str, int]]:
     raise ValueError("Header row not found (need columns 'Товары' and 'Цена продажи')")
 
 
-def _parse_xlsx(path: str) -> list[dict[str, Any]]:
+def _parse_xlsx(path: str, on_progress=None) -> list[dict[str, Any]]:
     """Прочитать Excel и вернуть список товаров.
 
     Формат файла — печатная форма прайса (1С/Контур):
@@ -236,7 +237,11 @@ def _parse_xlsx(path: str) -> list[dict[str, Any]]:
     skipped_no_name = 0
     skipped_no_price = 0
 
-    for row in rows[header_idx + 1:]:
+    _data_rows = rows[header_idx + 1:]
+    _total = len(_data_rows)
+    for _i, row in enumerate(_data_rows, 1):
+        if on_progress is not None:
+            on_progress(_i, _total)
         if not row or all(c is None for c in row):
             continue
 
@@ -344,13 +349,34 @@ async def refresh(force: bool = False, progress=None) -> int:
         _products = []
         return 0
 
-    await _notify("parse")
+    await _notify("parse", done=0, total=0)
+
+    # Синхронный парсинг гоняем в отдельном потоке, чтобы не блокировать
+    # event loop, а прогресс складываем в общий "ящик" и шлём тикером.
+    _box = {"done": 0, "total": 0}
+
+    def _on_row(done, total):
+        _box["done"] = done
+        _box["total"] = total
+
+    async def _ticker():
+        while True:
+            await asyncio.sleep(1.0)
+            await _notify("parse", done=_box["done"], total=_box["total"])
+
+    ticker_task = asyncio.create_task(_ticker())
     try:
-        _products = _parse_xlsx(CATALOG_FILE)
+        _products = await asyncio.to_thread(_parse_xlsx, CATALOG_FILE, _on_row)
         log.info("Catalog loaded: %d products", len(_products))
     except Exception as e:
         log.exception("Catalog parse error: %s", e)
         _products = []
+    finally:
+        ticker_task.cancel()
+        try:
+            await ticker_task
+        except asyncio.CancelledError:
+            pass
 
     await _notify("done", count=len(_products))
     return len(_products)
