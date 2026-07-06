@@ -71,6 +71,10 @@ async def main():
     )
     bot.session.middleware.register(msg_wipe_mw.bot_outgoing_logger)
     dp = Dispatcher(storage=MemoryStorage())
+    from middlewares.deleted_guard import DeletedGuardMiddleware
+    _deleted_guard = DeletedGuardMiddleware()
+    dp.message.middleware(_deleted_guard)
+    dp.callback_query.middleware(_deleted_guard)
     for r in ROUTERS:
         dp.include_router(r)
 

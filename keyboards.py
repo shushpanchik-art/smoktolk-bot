@@ -13,7 +13,6 @@ def kb_accept_rules() -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     b.button(text="📜 Прочитать правила", callback_data="show_rules_first")
     b.button(text="✅ Принимаю правила", callback_data="accept_rules")
-    b.button(text="🏬 Магазины", callback_data="store_address")
     b.adjust(1)
     return b.as_markup()
 
@@ -289,3 +288,12 @@ def kb_restore() -> InlineKeyboardMarkup:
     b.button(text="♻️ Восстановить профиль", callback_data="profile_restore")
     b.adjust(1)
     return b.as_markup()
+
+
+def kb_restore_own():
+    """Кнопка восстановления собственного удалённого профиля."""
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="♻️ Восстановить профиль",
+                              callback_data="restore_own_profile")],
+    ])
