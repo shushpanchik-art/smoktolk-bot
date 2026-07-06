@@ -399,7 +399,7 @@ async def adm_bc_mode_all(cb: CallbackQuery, state: FSMContext):
         await cb.answer()
         return
     await state.set_state(Adm.broadcast_text)
-    await state.update_data(bc_mode="all", bc_ids=None)
+    await state.update_data(bc_mode="all", bc_ids=None, text=None, photo=None)
     await cb.message.edit_text(
         "📢 <b>Общая рассылка</b>\n\nПришлите текст (HTML-теги поддерживаются):",
         reply_markup=kb.kb_admin_back()
@@ -413,7 +413,7 @@ async def adm_bc_mode_test(cb: CallbackQuery, state: FSMContext):
         await cb.answer()
         return
     await state.set_state(Adm.broadcast_test_ids)
-    await state.update_data(bc_mode="test")
+    await state.update_data(bc_mode="test", text=None, photo=None)
     await cb.message.edit_text(
         "🧪 <b>Тестовая рассылка</b>\n\n"
         "Пришлите ID пользователей.\n"
@@ -465,15 +465,18 @@ async def adm_broadcast_preview(msg: Message, state: FSMContext):
     data = await state.get_data()
     mode = data.get("bc_mode", "all")
     ids = data.get("bc_ids") or []
-    await state.update_data(text=msg.html_text)
+    photo = msg.photo[-1].file_id if msg.photo else None
+    text = msg.html_text if (msg.text or msg.caption) else ""
+    await state.update_data(text=text, photo=photo)
     if mode == "test":
         head = f"🧪 <b>Тестовая рассылка</b> — получателей: {len(ids)}\n\n"
     else:
         head = "📢 <b>Общая рассылка</b> (всем)\n\n"
-    await msg.answer(
-        head + "Превью:\n\n" + msg.html_text,
-        reply_markup=kb.kb_broadcast_confirm(mode=mode, count=len(ids))
-    )
+    kbd = kb.kb_broadcast_confirm(mode=mode, count=len(ids))
+    if photo:
+        await msg.answer_photo(photo, caption=(head + text)[:1024], reply_markup=kbd)
+    else:
+        await msg.answer(head + "Превью:\n\n" + text, reply_markup=kbd)
 
 
 @router.callback_query(F.data == "adm_bc_go")
@@ -484,8 +487,9 @@ async def adm_bc_go(cb: CallbackQuery, state: FSMContext, bot: Bot):
     data = await state.get_data()
     await state.clear()
     text = data.get("text")
+    photo = data.get("photo")
     mode = data.get("bc_mode", "all")
-    if not text:
+    if not text and not photo:
         await cb.answer("Нет текста", show_alert=True)
         return
     if mode == "test":
@@ -502,7 +506,10 @@ async def adm_bc_go(cb: CallbackQuery, state: FSMContext, bot: Bot):
     fails = []
     for uid in ids:
         try:
-            await bot.send_message(uid, text)
+            if photo:
+                await bot.send_photo(uid, photo, caption=text or None)
+            else:
+                await bot.send_message(uid, text)
             ok += 1
         except Exception:
             err += 1
