@@ -172,15 +172,16 @@ def kb_redeem_cancel() -> InlineKeyboardMarkup:
 def kb_admin_main() -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     b.button(text="📊 Статистика", callback_data="adm_stats")
+    b.button(text="📈 Отчёт за сегодня", callback_data="adm_today_report")
+    b.button(text="📤 Экспорт в CSV", callback_data="adm_export")
     b.button(text="👥 Пользователи", callback_data="adm_users")
     b.button(text="✅ Заявки на верификацию", callback_data="adm_verifs")
     b.button(text="🎁 Подарки", callback_data="adm_gifts")
     b.button(text="📢 Рассылка", callback_data="adm_broadcast")
-    b.button(text="📤 Экспорт в CSV", callback_data="adm_export")
     b.button(text="🔄 Обновить ассортимент", callback_data="adm_refresh_catalog")
-    b.button(text="📈 Отчёт за сегодня", callback_data="adm_today_report")
+    b.button(text="💾 Создать бэкап", callback_data="adm_backup")
     b.button(text="« В меню", callback_data="back_main")
-    b.adjust(1)
+    b.adjust(3, 2, 2, 2, 1)
     return b.as_markup()
 
 

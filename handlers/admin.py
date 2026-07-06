@@ -36,6 +36,51 @@ async def admin_main(cb: CallbackQuery):
     await cb.answer()
 
 
+@router.callback_query(F.data == "adm_backup")
+async def adm_backup(cb: CallbackQuery):
+    if not _is_admin(cb.from_user.id):
+        await cb.answer("Доступ запрещён", show_alert=True)
+        return
+    await cb.answer()
+    await cb.message.edit_text("💾 Создаю бэкап…\nПодождите несколько секунд.")
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "/opt/smoktolk/bot/backup.sh",
+            cwd="/opt/smoktolk/bot",
+            env={"BOT_DIR": "/opt/smoktolk/bot", "PATH": "/usr/local/bin:/usr/bin:/bin"},
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        try:
+            out_b, _ = await asyncio.wait_for(proc.communicate(), timeout=120)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await cb.message.edit_text(
+                "⚠️ Бэкап выполняется дольше 2 минут — прерван.",
+                reply_markup=kb.kb_admin_back(),
+            )
+            return
+        out = (out_b or b"").decode("utf-8", "replace").strip()
+        tail = "\n".join(out.splitlines()[-8:]) or "(нет вывода)"
+        if proc.returncode == 0:
+            await cb.message.edit_text(
+                f"✅ <b>Бэкап создан</b>\n\n<pre>{esc(tail)}</pre>",
+                reply_markup=kb.kb_admin_back(),
+            )
+        else:
+            log.error("adm_backup: exit=%s\n%s", proc.returncode, out)
+            await cb.message.edit_text(
+                f"❌ <b>Ошибка бэкапа</b> (код {proc.returncode})\n\n<pre>{esc(tail)}</pre>",
+                reply_markup=kb.kb_admin_back(),
+            )
+    except Exception as e:
+        log.exception("adm_backup failed")
+        await cb.message.edit_text(
+            f"❌ Не удалось запустить бэкап:\n<pre>{esc(str(e))}</pre>",
+            reply_markup=kb.kb_admin_back(),
+        )
+
+
 @router.callback_query(F.data == "adm_stats")
 async def adm_stats(cb: CallbackQuery):
     if not _is_admin(cb.from_user.id):
