@@ -179,6 +179,7 @@ def kb_admin_main() -> InlineKeyboardMarkup:
     b.button(text="📤 Экспорт в CSV", callback_data="adm_export")
     b.button(text="🔄 Обновить ассортимент", callback_data="adm_refresh_catalog")
     b.button(text="📈 Отчёт за сегодня", callback_data="adm_today_report")
+    b.button(text="💾 Создать бэкап", callback_data="adm_backup")
     b.button(text="« В меню", callback_data="back_main")
     b.adjust(1)
     return b.as_markup()
