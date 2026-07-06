@@ -284,21 +284,35 @@ async def adm_refresh_catalog(cb: CallbackQuery):
         await cb.answer()
         return
     await cb.answer()
+
+    async def _safe_edit(text, markup=None):
+        try:
+            await cb.message.edit_text(text, reply_markup=markup)
+        except Exception:
+            pass  # "message is not modified" и т.п.
+
+    async def _progress(stage, extra):
+        if stage == "download":
+            await _safe_edit("⬇️ Скачиваю прайс из Google-таблицы…")
+        elif stage == "parse":
+            await _safe_edit("🔄 Разбираю и нормализую товары…")
+        # 'done' обрабатываем ниже вручную (нужно ещё посчитать подарки)
+
     try:
-        await cb.message.edit_text("⏳ Загружаю прайс…")
-        n_p = await catalog.refresh(force=True)
-        await cb.message.edit_text("🔄 Нормализую категории…")
-        await asyncio.sleep(0.4)
+        await _safe_edit("⏳ Подготовка…")
+        n_p = await catalog.refresh(force=True, progress=_progress)
         gifts = await catalog.get_gifts()
         n_g = len(gifts)
-        await cb.message.edit_text(
+        await _safe_edit(
             f"✅ Готово: {n_p} товаров, {n_g} подарков.",
-            reply_markup=kb.kb_admin_back(),
+            markup=kb.kb_admin_back(),
         )
     except Exception as e:
         log.exception("refresh: %s", e)
-        await cb.message.edit_text(f"❌ Ошибка: <code>{esc(str(e))}</code>",
-                                   reply_markup=kb.kb_admin_back())
+        await _safe_edit(
+            f"❌ Ошибка: <code>{esc(str(e))}</code>",
+            markup=kb.kb_admin_back(),
+        )
 
 
 @router.callback_query(F.data == "adm_gifts")
@@ -353,7 +367,6 @@ async def adm_bc_go(cb: CallbackQuery, state: FSMContext, bot: Bot):
     ids = await db.all_user_ids(only_with_notifications=True)
     await cb.message.edit_text(f"📢 Рассылка идёт ({len(ids)} получателей)…")
     ok = err = 0
-    import asyncio
     for uid in ids:
         try:
             await bot.send_message(uid, text)
