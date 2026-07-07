@@ -51,4 +51,5 @@ if [ -z "$fresh" ]; then
 fi
 
 log "OK: свежий бэкап найден — $(basename "$fresh")"
+"$NOTIFY_SCRIPT" backup-ok "healthcheck: fresh backup $(basename "$fresh")" || true
 exit 0
