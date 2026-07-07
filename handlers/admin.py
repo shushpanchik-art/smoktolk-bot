@@ -31,11 +31,20 @@ def _is_admin(uid: int) -> bool:
 
 
 @router.callback_query(F.data == "admin_main")
-async def admin_main(cb: CallbackQuery):
+async def admin_main(cb: CallbackQuery, state: FSMContext):
     if not _is_admin(cb.from_user.id):
         await cb.answer("Доступ запрещён", show_alert=True)
         return
-    await cb.message.edit_text("🛠 <b>Админ-панель</b>", reply_markup=kb.kb_admin_main())
+    await state.clear()
+    try:
+        await cb.message.edit_text("🛠 <b>Админ-панель</b>", reply_markup=kb.kb_admin_main())
+    except Exception:
+        # сообщение-фото или нельзя редактировать — удаляем и шлём новое
+        try:
+            await cb.message.delete()
+        except Exception:
+            pass
+        await cb.message.answer("🛠 <b>Админ-панель</b>", reply_markup=kb.kb_admin_main())
     await cb.answer()
 
 
@@ -485,13 +494,13 @@ async def adm_bc_go(cb: CallbackQuery, state: FSMContext, bot: Bot):
         await cb.answer()
         return
     data = await state.get_data()
-    await state.clear()
     text = data.get("text")
     photo = data.get("photo")
     mode = data.get("bc_mode", "all")
     if not text and not photo:
         await cb.answer("Нет текста", show_alert=True)
         return
+    await state.clear()
     if mode == "test":
         ids = data.get("bc_ids") or []
         if not ids:
@@ -501,7 +510,12 @@ async def adm_bc_go(cb: CallbackQuery, state: FSMContext, bot: Bot):
     else:
         ids = await db.all_user_ids(only_with_notifications=True)
         label = "📢 Рассылка"
-    await cb.message.edit_text(f"{label} идёт ({len(ids)} получателей)…")
+    try:
+        await cb.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await cb.answer()
+    progress = await cb.message.answer(f"{label} идёт ({len(ids)} получателей)…")
     ok = err = 0
     fails = []
     for uid in ids:
@@ -519,7 +533,10 @@ async def adm_bc_go(cb: CallbackQuery, state: FSMContext, bot: Bot):
     report = f"✅ Готово.\nДоставлено: {ok}\nОшибок: {err}"
     if mode == "test" and fails:
         report += "\n\nНе доставлено:\n" + "\n".join(f"• <code>{u}</code>" for u in fails[:30])
-    await cb.message.answer(report, reply_markup=kb.kb_admin_back())
+    try:
+        await progress.edit_text(report, reply_markup=kb.kb_admin_back())
+    except Exception:
+        await cb.message.answer(report, reply_markup=kb.kb_admin_back())
 
 
 # ============== УДАЛЕНИЕ / ВОССТАНОВЛЕНИЕ ПРОФИЛЯ (админ) ==============
