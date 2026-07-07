@@ -203,6 +203,33 @@ case "$EVENT" in
         fi
         ;;
 
+    backup-ok)
+        # === Ежедневная сводка "бэкап ОК". Анти-спам: не чаще раза в 20ч ===
+        ensure_backup_state_dir
+        OK_STATE_FILE="${BACKUP_STATE_DIR}/last-ok-notify"
+        MIN_INTERVAL_SEC=72000  # 20 часов
+        now="$(date +%s)"
+        if [ -f "$OK_STATE_FILE" ]; then
+            last="$(cat "$OK_STATE_FILE" 2>/dev/null || echo 0)"
+            case "$last" in ''|*[!0-9]*) last=0 ;; esac
+            if [ $(( now - last )) -lt "$MIN_INTERVAL_SEC" ]; then
+                log "INFO: backup-ok уже отправляли менее 20ч назад — пропускаем"
+                exit 0
+            fi
+        fi
+        read_credentials
+        DATE_STR="$(date '+%d.%m.%Y')"
+        TEXT="✅ *SMOKTOLK backup ОК*
+Бэкап БД свежий и на месте. Проверка от ${DATE_STR}."
+        if send_telegram "$TEXT"; then
+            echo "$now" > "$OK_STATE_FILE"
+            chown smoktolk:smoktolk "$OK_STATE_FILE" 2>/dev/null || true
+            log "OK: backup-ok отправлен, state обновлён"
+        else
+            exit $?
+        fi
+        ;;
+
     *)
         log "ERROR: неизвестное событие: '$EVENT'. Допустимо: down, backup-failed, backup-recovered, offsite-failed, offsite-recovered, offsite-full-failed, offsite-full-recovered"
         exit 2

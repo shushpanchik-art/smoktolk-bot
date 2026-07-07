@@ -97,7 +97,7 @@ def test_01_happy_path_fresh_backup(env_setup):
     r = _run(env_setup)
     assert r.returncode == 0, r.stderr
     assert "OK: свежий бэкап найден" in r.stdout
-    assert _notify_events(env_setup) == []
+    assert _notify_events(env_setup) == ["backup-ok"]
 
 
 def test_02_safety_net_window_ok(env_setup):
@@ -110,7 +110,7 @@ def test_02_safety_net_window_ok(env_setup):
     r = _run(env_setup, max_age_hours=192)
     assert r.returncode == 0, r.stderr
     assert "OK" in r.stdout
-    assert _notify_events(env_setup) == []
+    assert _notify_events(env_setup) == ["backup-ok"]
 
 
 def test_03_just_below_limit_ok(env_setup):
@@ -163,4 +163,4 @@ def test_08_multiple_files_picks_fresh(env_setup):
     _make_backup(env_setup, "smoktolk_20260516_040000.db", age_hours=2)
     r = _run(env_setup)
     assert r.returncode == 0
-    assert _notify_events(env_setup) == []
+    assert _notify_events(env_setup) == ["backup-ok"]
