@@ -202,8 +202,7 @@ def kb_admin_back() -> InlineKeyboardMarkup:
 def kb_admin_user_card(user_id: int, username: str | None = None, deleted: bool = False) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     b.button(text=f"\U0001F4CB Скопировать ID: {user_id}", copy_text=CopyTextButton(text=str(user_id)))
-    if username:
-        b.button(text="\u2709\ufe0f Написать", url=f"https://t.me/{username}")
+    b.button(text="\u2709\ufe0f Написать", url=f"tg://user?id={user_id}")
     b.button(text="➕ Начислить", callback_data=f"adm_pts_add:{user_id}")
     b.button(text="➖ Списать", callback_data=f"adm_pts_sub:{user_id}")
     b.button(text="🎂 Изменить ДР", callback_data=f"adm_bday_set:{user_id}")
@@ -214,10 +213,7 @@ def kb_admin_user_card(user_id: int, username: str | None = None, deleted: bool 
     else:
         b.button(text="🗑 Удалить профиль", callback_data=f"adm_del:{user_id}")
     b.button(text="« К поиску", callback_data="adm_users")
-    if username:
-        b.adjust(2, 2, 1, 1, 1, 1, 1)
-    else:
-        b.adjust(1, 2, 1, 1, 1, 1, 1)
+    b.adjust(2, 2, 1, 1, 1, 1, 1)
     return b.as_markup()
 
 
