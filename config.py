@@ -21,6 +21,7 @@ LOG_FILE = os.getenv("LOG_FILE", "/opt/smoktolk/bot/logs/bot.log")
 TZ = os.getenv("TZ", "Europe/Moscow")
 
 BOT_USERNAME = "SMOKTOLK_bot"
+CHANNEL_URL = "https://t.me/SMOKTOLK"  # публичный канал @SMOKTOLK
 
 # ====== УРОВНИ ======
 @dataclass
