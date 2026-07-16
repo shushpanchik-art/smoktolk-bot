@@ -98,13 +98,19 @@ def kb_gift_confirm(code: str) -> InlineKeyboardMarkup:
     return b.as_markup()
 
 
-def kb_catalog_categories(categories: list[str]) -> InlineKeyboardMarkup:
+def kb_catalog_categories(categories: list[str], age_verified: bool = False) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     rows = catalog_norm.category_rows(set(categories))
     counts = []
     for row in rows:
         for c in row:
-            b.button(text=catalog_norm.category_title(c), callback_data=f"cat_cat:{c}")
+            title = catalog_norm.category_title(c)
+            if not age_verified and catalog_norm.is_age_restricted(c):
+                title = f"🔒 {title}"
+                cd = f"cat_locked:{c}"
+            else:
+                cd = f"cat_cat:{c}"
+            b.button(text=title, callback_data=cd)
         counts.append(len(row))
     b.button(text="« Назад", callback_data="back_main")
     counts.append(1)

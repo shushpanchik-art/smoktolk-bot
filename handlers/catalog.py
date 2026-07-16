@@ -37,14 +37,21 @@ async def catalog_main(cb: CallbackQuery):
         await cb.answer()
         return
     cats = sorted({p["category"] for p in products})
+    user = await db.get_user(cb.from_user.id)
+    age_ok = bool(user and user["age_verified"])
     text = "<b>Ассортимент</b>\n\nЦены и наличие - для информации.\n\nВыберите категорию:"
-    await _edit_or_send(cb, text, kb.kb_catalog_categories(cats))
+    await _edit_or_send(cb, text, kb.kb_catalog_categories(cats, age_verified=age_ok))
     await cb.answer()
 
 
 @router.callback_query(F.data.startswith("cat_cat:"))
 async def cat_category(cb: CallbackQuery):
     cat = cb.data.split(":", 1)[1]
+    if catalog_norm.is_age_restricted(cat):
+        user = await db.get_user(cb.from_user.id)
+        if not (user and user["age_verified"]):
+            await cb.answer("🔞 Раздел 18+. Нужно подтвердить возраст.", show_alert=True)
+            return
     products = [p for p in await catalog.get_products() if p["category"] == cat]
     if not products:
         await cb.answer("В этой категории пусто", show_alert=True)
@@ -153,4 +160,19 @@ async def catalog_consult(cb: CallbackQuery):
 
 @router.callback_query(F.data == "noop")
 async def cat_noop(cb: CallbackQuery):
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("cat_locked:"))
+async def cat_locked(cb: CallbackQuery):
+    text = (
+        "🔞 <b>Раздел 18+</b>\n\n"
+        "Этот раздел доступен после подтверждения возраста.\n"
+        "Нажмите кнопку ниже, чтобы пройти верификацию."
+    )
+    b = InlineKeyboardBuilder()
+    b.button(text="📷 Подтвердить возраст", callback_data="verify_start")
+    b.button(text="« В каталог", callback_data="catalog_main")
+    b.adjust(1)
+    await _edit_or_send(cb, text, b.as_markup())
     await cb.answer()

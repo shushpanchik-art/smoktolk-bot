@@ -122,6 +122,7 @@ async def adm_today(cb: CallbackQuery):
     d = await db.get_daily(today)
     text = (
         f"📈 <b>Отчёт за {today}</b>\n\n"
+        f"Заходов /start: <b>{d.get('start_clicks', 0)}</b>\n"
         f"Новых пользователей: <b>{d['new_users']}</b>\n"
         f"Возраст подтверждён: <b>{d['age_verified']}</b>\n"
         f"Покупок: <b>{d['purchases_count']}</b> на <b>{d['purchases_sum']} ₽</b>\n"
