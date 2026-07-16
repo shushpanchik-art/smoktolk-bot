@@ -85,6 +85,7 @@ async def start_plain(msg: Message, state: FSMContext):
 
 
 async def _start_common(msg: Message, state: FSMContext, referrer_id):
+    await db.bump_daily("start_clicks")  # U10c: метрика заходов /start
     user = await db.get_user(msg.from_user.id)
     # Удалённый профиль (grace period): прогоняем через онбординг как новичка.
     # Данные в БД сохранены; восстановление произойдёт после принятия правил.

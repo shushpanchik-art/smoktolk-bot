@@ -120,7 +120,8 @@ CREATE TABLE IF NOT EXISTS daily_stats (
     points_earned INTEGER DEFAULT 0,
     points_spent INTEGER DEFAULT 0,
     points_burned INTEGER DEFAULT 0,
-    gifts_redeemed INTEGER DEFAULT 0
+    gifts_redeemed INTEGER DEFAULT 0,
+    start_clicks INTEGER DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS product_images (
     name_key TEXT PRIMARY KEY,
@@ -134,6 +135,12 @@ async def init():
     async with aiosqlite.connect(DB_PATH) as conn:
         await conn.executescript(SCHEMA)
         await conn.commit()
+        # Миграция: колонка start_clicks в daily_stats (U10c метрика заходов).
+        try:
+            await conn.execute("ALTER TABLE daily_stats ADD COLUMN start_clicks INTEGER DEFAULT 0")
+            await conn.commit()
+        except Exception:
+            pass  # колонка уже есть
     await db_deletion.migrate_deletion_columns(DB_PATH)
     log.info("DB initialized: %s", DB_PATH)
 
@@ -619,7 +626,8 @@ async def bump_daily(field: str, delta: int = 1, date: Optional[str] = None):
     if date is None:
         date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     allowed = {"new_users", "age_verified", "purchases_count", "purchases_sum",
-               "points_earned", "points_spent", "points_burned", "gifts_redeemed"}
+               "points_earned", "points_spent", "points_burned", "gifts_redeemed",
+               "start_clicks"}
     if field not in allowed:
         return
     async with aiosqlite.connect(DB_PATH) as conn:
@@ -638,7 +646,7 @@ async def get_daily(date: str) -> dict:
             return dict(row)
     return {"date": date, "new_users": 0, "age_verified": 0, "purchases_count": 0,
             "purchases_sum": 0, "points_earned": 0, "points_spent": 0,
-            "points_burned": 0, "gifts_redeemed": 0}
+            "points_burned": 0, "gifts_redeemed": 0, "start_clicks": 0}
 
 
 # Алиас для совместимости с bot.py

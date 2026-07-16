@@ -46,6 +46,15 @@ CATEGORY_META = {
 }
 
 
+# Категории БЕЗ возрастного ограничения (доступны без верификации 18+).
+FREE_CATEGORIES = frozenset({"kofe", "energetiki", "glicerin", "aromatizator", "raznoe"})
+
+
+def is_age_restricted(key: str) -> bool:
+    """True — если категория требует подтверждения возраста 18+."""
+    return key not in FREE_CATEGORIES
+
+
 def normalize_category(raw: str) -> str:
     """Привести исходный 'Тип' к финальному ключу категории."""
     if not raw:
