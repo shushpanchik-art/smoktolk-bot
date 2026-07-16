@@ -130,3 +130,13 @@ def test_kb_delete_confirm():
 
 def test_kb_restore():
     assert isinstance(kb.kb_restore(), InlineKeyboardMarkup)
+
+
+def _urls(markup) -> set:
+    return {btn.url for row in markup.inline_keyboard for btn in row if btn.url}
+
+
+def test_kb_main_channel_button():
+    m = kb.kb_main(is_admin=False)
+    assert "https://t.me/SMOKTOLK" in _urls(m)
+    assert any("канал" in t.lower() for t in _texts(m))

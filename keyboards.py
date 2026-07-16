@@ -6,7 +6,7 @@ from aiogram.types import (InlineKeyboardMarkup,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from config import LEVELS, BOT_USERNAME
+from config import LEVELS, BOT_USERNAME, CHANNEL_URL
 
 
 def kb_accept_rules() -> InlineKeyboardMarkup:
@@ -32,12 +32,13 @@ def kb_main(is_admin: bool = False) -> InlineKeyboardMarkup:
     b.button(text="🛍 Ассортимент", callback_data="catalog_main")
     b.button(text="👥 Пригласить друга", callback_data="referral_main")
     b.button(text="🏬 Магазины", callback_data="store_address")
+    b.button(text="📢 Наш канал @SMOKTOLK", url=CHANNEL_URL)
     b.button(text="📜 Правила", callback_data="rules_main")
     b.button(text="🆘 Поддержка", callback_data="support_main")
     b.button(text="💸 Списать баллы", callback_data="redeem_start")
     if is_admin:
         b.button(text="🛠 Админ-панель", callback_data="admin_main")
-    b.adjust(2, 2, 2, 2, 1, 1)
+    b.adjust(2, 2, 2, 2, 2, 1)
     return b.as_markup()
 
 
