@@ -1,0 +1,115 @@
+SMOKTOLK BOT — PROJECT_BOOK (справочник проекта)
+================================================
+Обновлено по факту разведки кода. Истина — код + docs/SPEC.md, docs/ROADMAP.md, CHANGELOG.md.
+
+НАЗНАЧЕНИЕ
+Telegram-бот табачного магазина SMOKTOLK: каталог товаров, профиль/баллы/уровни,
+рефералы, подарки по QR, списание баллов по QR/бэкап-коду через кассу (POS webhook),
+верификация возраста 18+, админ-панель, удаление профиля (soft-delete), инфо о магазине.
+
+РАЗМЕЩЕНИЕ И ЗАПУСК
+Код:      /opt/smoktolk/bot
+venv:     /opt/smoktolk/bot/venv/bin/python  (Python 3.11.2)
+systemd:  smoktolk-bot.service (loaded/active/running, "Smoktolk Telegram Bot")
+          drop-in: systemd/smoktolk-bot.service.d/{10-alerts.conf,20-resources.conf}
+Режим:    POLLING (bot.py:102 dp.start_polling, allowed_updates=resolve_used_update_types()).
+          webhook.py тоже подключается (webhook.setup_webhook(app)) для приёма POST от кассы (POS).
+БД:       SQLite, aiosqlite. DB_PATH (по умолч. smoktolk.db, факт в data/*.db). Миграции при старте:
+          msg_wipe.migrate_msg_log() + миграции db_deletion (deleted_at/deleted_by/purged_at/warned_before_purge).
+Управление: sudo systemctl restart|status smoktolk-bot ; journalctl -u smoktolk-bot -n50 [--since ...]
+
+СТЕК (requirements.txt, exact pin; Dependabot авто-PR)
+aiogram==3.29.1, aiohttp==3.14.1, aiosqlite==0.22.1, openpyxl==3.1.5 (Excel-отчёты),
+qrcode==8.2 + Pillow==12.3.0 (QR для подарков/REDEEM, utils.make_qr),
+python-dotenv==1.2.2, pytz==2026.2 (MSK).
+dev (requirements-dev.txt): pytest==9.1.1, pytest-asyncio==1.4.0, pytest-cov==7.1.0.
+
+СТРУКТУРА (корень плоский, не app/)
+bot.py            — точка входа: init, миграции, регистрация ROUTERS, msg_wipe middleware
+                    (bot.session.middleware.register — НЕ .middleware(fn), падает), polling.
+config.py         — все настройки из ENV + дефолты; STORE_* и _build_store_info_text (адрес,
+                    часы, парковка STORE_PARKING, 2GIS/Яндекс.карты, телефон), CHANNEL_URL, BOT_USERNAME.
+db.py             — основная БД-логика, таблицы, баллы/уровни, подарки, redemptions, QR-токены
+                    (secrets.token_urlsafe), soft_delete_profile.
+db_deletion.py    — soft-delete профиля: soft_delete_profile, restore_profile,
+                    warn_before_purge_candidates, purge_expired_profiles, migrate_deletion_columns
+                    (deleted_at/deleted_by/purged_at/warned_before_purge). Баллы/покупки живут, потом purge.
+webhook.py        — aiohttp: POST /pos/redeem {qr_token|backup_code} — списание баллов кассой.
+                    WEBHOOK_MODE=stub|live, WEBHOOK_TOKEN защита. Fallback по backup_code — TODO (SPEC).
+catalog.py, catalog_norm.py — парсинг/нормализация прайса (openpyxl read_only, 104s->2s), CATEGORY_META.
+keyboards.py      — inline-клавиатуры: kb_main (кнопка "📢 Наш канал @SMOKTOLK" -> CHANNEL_URL),
+                    kb_profile, kb_admin_*, реф-ссылка/поделиться, "✉️ Написать" (https://t.me/{username}).
+product_images.py — картинки товаров. tasks.py — фоновые задачи. utils.py — make_qr и пр.
+msg_wipe.py / msg_wipe_mw.py — учёт message_id бота (таблица bot_messages) + вайп своих сообщений
+                    моложе 48ч (batch deleteMessages<=100, fallback поштучно) при удалении профиля.
+crash_alert.py    — алерт админу при падении. db_deletion — см. выше.
+handlers/__init__.py -> ROUTERS = [start, profile, gifts, catalog, referral, rules, verify, admin,
+                    _admin_addon, address].router
+services/         — admin_notify.py (уведомления админу).
+middlewares/      — deleted_guard.py (DeletedGuard: перехват удалённых профилей -> онбординг восстановления).
+docs/             — AI_ONBOARDING.md, BACKUP.md, OPERATIONS.md, ROADMAP.md, SECURITY.md,
+                    ANIMATED_AVATAR_RECIPE.md. Корень: README.md, SPEC.md, CHANGELOG.md,
+                    CONTRIBUTING.md, ONBOARDING_AI.md.
+scripts/          — backup.sh и семейство offsite/full-offsite + *_healthcheck.sh, notify_admin.sh
+                    (читает BOT_TOKEN/ADMIN_ID из .env, шлёт sendMessage), deploy_systemd.sh,
+                    set_animated_botpic.py, git-hooks/ + setup-hooks.sh (pre-push защита main).
+systemd/          — bot + backup/backup-offsite/backup-full-offsite (.service+.timer) +
+                    *-healthcheck.{service,timer} + *-alert.service. Внешние таймеры для бэкапов/алертов.
+assets/, data/, logs/, media(product_images).
+
+БД ТАБЛИЦЫ (CREATE TABLE)
+users, history, purchases, gifts_log, verification_requests, redemptions,
+gift_cooldowns, daily_stats, product_images (db.py); bot_messages (msg_wipe.py).
+users расширена колонками soft-delete (db_deletion). qr_token/backup_code — бизнес-QR, НЕ секреты.
+
+ENV (config.py getenv; .env права 640; .env.example — шаблон)
+BOT_TOKEN, ADMIN_ID(деф.5899721537), ADMIN_USERNAME(деф.utc200),
+WEBHOOK_HOST(127.0.0.1)/PORT(8080)/TOKEN/MODE(stub|live), POS_API_KEY,
+CATALOG_URL (публичная ссылка Яндекс.Диск), DB_PATH(smoktolk.db), LOG_FILE, TZ(Europe/Moscow),
+TELEGRAPH_TOKEN (страница ПДн, PR #43), STORE_* (CITY/ADDRESS/HOURS/MAP_URL/MAP2_URL/PHONE/PARKING).
+BOT_USERNAME="SMOKTOLK_bot", CHANNEL_URL="https://t.me/SMOKTOLK" — хардкод в config.py.
+test проверяет соответствие .env.example ключам config.py (как в SMOKI-паттерне).
+
+CI (.github/workflows/ci.yml — push + pull_request). Джобы:
+  syntax   — компиляция/синтаксис.
+  lint     — ruff==0.15.12  (ruff check .)
+  security — bandit==1.9.4  (medium+high only)
+  deps     — pip-audit -r requirements.txt
+  tests    — pytest + coverage, --cov-fail-under=10 (порог низкий!), артефакты htmlcov+coverage.xml
+Actions pinned by SHA: checkout v7.0.0, setup-python v6.3.0, upload-artifact v7.0.1.
+ВНИМАНИЕ: в отличие от SMOKI, тут НЕТ mypy, codespell, yamllint, markdownlint, gitleaks в CI.
+Перед push локально можно: venv/bin/ruff check <файлы>. gitleaks история чиста (101 commit, no leaks).
+pytest.ini: asyncio_mode=auto, testpaths=tests, --strict-markers, marker slow.
+
+GIT FLOW
+GitHub: git@github.com:shushpanchik-art/smoktolk-bot.git — репозиторий ПУБЛИЧНЫЙ (Actions бесплатны).
+main protected, прямых коммитов нет. Ветка feature|fix|chore|docs -> add/commit/push ->
+gh pr create -> ждать зелёный CI -> merge через UI (squash) -> main pull -> branch -d -> remote prune.
+pre-push hook блокирует прямой push/delete в main (env SMOKTOLK_PROTECTED_BRANCHES),
+audit-log в .git/branch-guard.log.
+
+СТАТУС ROADMAP (сверено с кодом, docs/ROADMAP.md)
+ФАЗА 1: 1.1 back_main "В главное меню" — ГОТОВО (handlers/address.py:26).
+        1.2 парковка STORE_PARKING — ГОТОВО (config.py:124/134).
+        1.3 copy id: только <code>{id}</code> (копируется тапом); CopyTextButton НЕ добавлен — открыто.
+ФАЗА 2: 2.1 ReplyKeyboardRemove после телефона + меню — ГОТОВО (start.py:196-198).
+        2.2 "✉️ Написать" — ГОТОВО, но через https://t.me/{username} (не tg://user?id) (keyboards.py:200).
+        2.3 статусы обновления каталога — ГОТОВО (отмечено ✅ в ROADMAP).
+ФАЗА 3: 3.1 удаление профиля — soft-delete РЕАЛИЗОВАН (db_deletion.py, profile.py:281 user,
+            admin.py:571 admin, DeletedGuard middleware, восстановление через онбординг). Тест test_*.
+        3.2 категорийный доступ 18+ (FREE_CATEGORIES) — НЕ реализован; есть только верификация
+            возраста (handlers/verify.py, db.age_verified). ОТКРЫТО.
+Смёржено вне ROADMAP: U10 — кнопка "📢 Наш канал @SMOKTOLK" в главном меню (PR #95).
+Прочее недавнее (main): backup-ok уведомление(#94), рассылка с фото(#92/#93),
+product images url column(#91), manual backup(#90), catalog read_only ускорение(#89),
+восстановление удалённого профиля + DeletedGuard(#88).
+
+БЛИЖАЙШИЕ ЗАДАЧИ (кандидаты)
+- 3.2 категорийный доступ 18+ (FREE_CATEGORIES в catalog_norm.py + фильтр в handlers/catalog.py). Риск высокий.
+- 1.3 CopyTextButton для user_id в админке (aiogram 3.29 поддерживает). Риск нулевой, MVP.
+- Довести CI до уровня SMOKI (mypy/codespell/yamllint/markdownlint/gitleaks) — по желанию.
+
+ПРАВИЛА РАБОТЫ
+Разведка перед правкой (ls/grep/cat). После записи файла: python3 -c "import ast; ast.parse(open('f').read())".
+Импорты: venv/bin/python -c "import ...". Мусор: _patch_*.py/*.bak уже в .gitignore и НЕ в git.
+Каждый модуль -> сразу проверка+интеграция+тест (tests/, conftest tmp_db).
