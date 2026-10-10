@@ -6,7 +6,7 @@
 # Dependabot bumps via auto-PRs (see .github/dependabot.yml).
 
 aiogram==3.29.1          # Telegram Bot framework
-aiohttp==3.14.1          # async HTTP client (transitively used by aiogram)
+aiohttp==3.14.3          # async HTTP client (transitively used by aiogram)
 aiosqlite==0.22.1        # async SQLite driver
 openpyxl==3.1.5          # Excel export (admin reports)
 qrcode==8.2              # QR generation for gifts and REDEEM tokens
